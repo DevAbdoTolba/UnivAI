@@ -1,0 +1,8 @@
+[submodule "UnivAI-app"]
+	path = UnivAI-app
+	url = https://github.com/abdalrahmanalirajab/UnivAI-app
+	branch = main
+[submodule "UnivAI-exam_system"]
+	path = UnivAI-exam_system
+	url = https://github.com/AhmedSamirKhalaf/UnivAI-exam_system
+	branch = main
