@@ -4,13 +4,12 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import CardActions from "@mui/material/CardActions";
 import Button from "@mui/material/Button";
-import Link from "next/link";
 
 const STEPS = [
   {
     href: "/upload",
     title: "1 — Upload your book",
-    body: "Upload one textbook PDF. It is chunked, embedded and made searchable.",
+    body: "Upload one textbook PDF. It is handed to the RAG service for indexing.",
     action: "Upload",
   },
   {
@@ -47,7 +46,7 @@ export default function Home() {
               </Typography>
             </CardContent>
             <CardActions>
-              <Button component={Link} href={step.href} size="small">
+              <Button href={step.href} size="small">
                 {step.action}
               </Button>
             </CardActions>
