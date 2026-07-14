@@ -107,7 +107,13 @@ export default function LectureRoom({ lectureId }: Props) {
           try {
             const message = JSON.parse(new TextDecoder().decode(payload));
             if (message.type === "slide" && typeof message.n === "number") setSlide(message.n);
-            if (message.type === "state") setAgentState(message.state as AgentState);
+            if (message.type === "state") {
+              setAgentState(message.state as AgentState);
+              // Reaching the end closes the lecture: it cannot be reopened.
+              if (message.state === "ended") {
+                fetch(`/api/lecture/${lectureId}/complete`, { method: "POST" });
+              }
+            }
             if (message.type === "answer") setLastAnswer(message.payload);
             if (message.type === "transcript") setTranscript(message.text ?? null);
           } catch {

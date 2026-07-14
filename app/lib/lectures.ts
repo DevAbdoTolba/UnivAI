@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { query } from "./db";
-import { now } from "./clock";
+import { now, MINUTE_MS } from "./clock";
 
 /**
  * Lecture content is PREMADE and committed under lectures/week-N/:
@@ -14,8 +14,19 @@ export const REPO_ROOT = path.resolve(process.cwd(), "..");
 export const LECTURES_DIR = path.join(REPO_ROOT, "lectures");
 export const WEEKS = 4;
 
+/** How long a lecture is "on" for. */
+export const LECTURE_WINDOW_MINUTES = 60;
+/**
+ * You cannot walk into a lecture that is already half over — you would miss the
+ * material the quiz is about. Turning up after this is an absence, not a late arrival.
+ */
+export const JOIN_CUTOFF_MINUTES = LECTURE_WINDOW_MINUTES / 2;
+
 export type Segment = { slide: number; text: string; citations: { page: number }[] };
 export type Script = { lectureId: string; title: string; segments: Segment[] };
+
+/** Why a lecture cannot be opened. `null` means it can. */
+export type BlockedReason = "not_started" | "too_late" | "completed" | "missed" | null;
 
 export type Lecture = {
   id: number;
@@ -24,10 +35,10 @@ export type Lecture = {
   startsAt: Date;
   /** derived from the VIRTUAL clock, never the wall clock */
   state: "upcoming" | "live" | "done";
+  joinable: boolean;
+  blockedReason: BlockedReason;
+  completed: boolean;
 };
-
-/** A lecture is joinable from its start time until it ends. */
-export const LECTURE_WINDOW_MINUTES = 60;
 
 export async function readScript(week: number): Promise<Script | null> {
   try {
@@ -62,17 +73,56 @@ export async function getLectures(): Promise<Lecture[]> {
   await ensureSchedule();
   const virtualNow = await now();
 
-  const rows = await query<{ id: number; week: number; title: string; starts_at: Date }>(
-    "SELECT id, week, title, starts_at FROM lectures ORDER BY week ASC"
+  const rows = await query<{
+    id: number;
+    week: number;
+    title: string;
+    starts_at: Date;
+    joined_at: Date | null;
+    completed_at: Date | null;
+  }>(
+    `SELECT l.id, l.week, l.title, l.starts_at, a.joined_at, a.completed_at
+       FROM lectures l
+       LEFT JOIN attendance a ON a.lecture_id = l.id
+      ORDER BY l.week ASC`
   );
 
   return rows.map((row) => {
     const startsAt = new Date(row.starts_at);
-    const endsAt = new Date(startsAt.getTime() + LECTURE_WINDOW_MINUTES * 60_000);
+    const cutoff = new Date(startsAt.getTime() + JOIN_CUTOFF_MINUTES * MINUTE_MS);
+    const endsAt = new Date(startsAt.getTime() + LECTURE_WINDOW_MINUTES * MINUTE_MS);
+    const completed = Boolean(row.completed_at);
+
     let state: Lecture["state"] = "upcoming";
     if (virtualNow >= endsAt) state = "done";
     else if (virtualNow >= startsAt) state = "live";
 
-    return { id: row.id, week: row.week, title: row.title, startsAt, state };
+    let blockedReason: BlockedReason = null;
+    if (completed) {
+      blockedReason = "completed";              // you have already sat through it
+    } else if (virtualNow < startsAt) {
+      blockedReason = "not_started";
+    } else if (virtualNow > cutoff) {
+      // More than half the lecture has gone. Too late to walk in.
+      blockedReason = row.joined_at ? "too_late" : "missed";
+    }
+
+    return {
+      id: row.id,
+      week: row.week,
+      title: row.title,
+      startsAt,
+      state,
+      completed,
+      joinable: blockedReason === null,
+      blockedReason,
+    };
   });
 }
+
+export const BLOCKED_MESSAGE: Record<NonNullable<BlockedReason>, string> = {
+  not_started: "This lecture has not started yet.",
+  too_late: `You cannot rejoin: more than ${JOIN_CUTOFF_MINUTES} minutes of the lecture have passed.`,
+  missed: `You missed this lecture. The doors close ${JOIN_CUTOFF_MINUTES} minutes after it starts.`,
+  completed: "You have already finished this lecture.",
+};

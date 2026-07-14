@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { queryOne } from "@/lib/db";
 import { stampJoin } from "@/lib/attendance";
+import { getLectures, BLOCKED_MESSAGE } from "@/lib/lectures";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     [lectureId]
   );
   if (!lecture) return Response.json({ error: "No such lecture." }, { status: 404 });
+
+  // The doors close halfway through, and a finished lecture cannot be reopened.
+  // The UI disables the button; this makes the rule real.
+  const schedule = await getLectures();
+  const entry = schedule.find((item) => item.id === lectureId);
+  if (entry && !entry.joinable) {
+    return Response.json(
+      { error: BLOCKED_MESSAGE[entry.blockedReason!], reason: entry.blockedReason },
+      { status: 403 }
+    );
+  }
 
   const apiKey = env.LIVEKIT_API_KEY;
   const apiSecret = env.LIVEKIT_API_SECRET;

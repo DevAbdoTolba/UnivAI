@@ -66,3 +66,7 @@ CREATE TABLE IF NOT EXISTS qa_log (
   model_used TEXT,
   asked_at   TIMESTAMPTZ NOT NULL                 -- virtual time
 );
+
+-- The student finished watching this lecture (the Lecturer agent reached the end).
+-- A finished lecture cannot be re-opened.
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;

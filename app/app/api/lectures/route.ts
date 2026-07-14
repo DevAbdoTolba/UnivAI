@@ -1,4 +1,4 @@
-import { getLectures, readScript } from "@/lib/lectures";
+import { getLectures, readScript, BLOCKED_MESSAGE } from "@/lib/lectures";
 import { getAttendance } from "@/lib/attendance";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +17,11 @@ export async function GET() {
         title: lecture.title,
         startsAt: lecture.startsAt.toISOString(),
         state: lecture.state,
+        joinable: lecture.joinable,
+        completed: lecture.completed,
+        blockedMessage: lecture.blockedReason
+          ? BLOCKED_MESSAGE[lecture.blockedReason]
+          : null,
         slides: script?.segments.length ?? 0,
         attendance: record
           ? {

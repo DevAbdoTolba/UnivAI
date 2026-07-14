@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
@@ -25,6 +26,9 @@ type Lecture = {
   title: string;
   startsAt: string;
   state: "upcoming" | "live" | "done";
+  joinable: boolean;
+  completed: boolean;
+  blockedMessage: string | null;
   slides: number;
   attendance: { status: string; joinedAt: string | null; lateMinutes: number } | null;
 };
@@ -75,6 +79,11 @@ export default function SchedulePage() {
                 secondary={new Date(lecture.startsAt).toUTCString()}
               />
               <Grid container spacing={1}>
+                {lecture.completed ? (
+                  <Grid>
+                    <Chip size="small" color="success" variant="outlined" label="finished" />
+                  </Grid>
+                ) : null}
                 {lecture.attendance ? (
                   <Grid>
                     <Chip
@@ -133,6 +142,12 @@ export default function SchedulePage() {
                 </Grid>
               </Grid>
 
+              {selected.blockedMessage ? (
+                <Alert severity={selected.completed ? "success" : "warning"}>
+                  {selected.blockedMessage}
+                </Alert>
+              ) : null}
+
               <Divider />
 
               <Stack spacing={1}>
@@ -169,9 +184,13 @@ export default function SchedulePage() {
               variant="contained"
               component={Link}
               href={`/lecture/${selected.id}`}
-              disabled={selected.state === "upcoming"}
+              disabled={!selected.joinable}
             >
-              {selected.state === "live" ? "Join lecture" : "Open lecture"}
+              {selected.completed
+                ? "Finished"
+                : selected.joinable
+                  ? "Join lecture"
+                  : "Closed"}
             </Button>
           ) : null}
         </DialogActions>

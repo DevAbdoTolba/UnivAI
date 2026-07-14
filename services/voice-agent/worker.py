@@ -40,7 +40,7 @@ from livekit import agents, rtc
 
 from common.device import whisper_settings, describe  # noqa: E402
 from qa import answer_question  # noqa: E402
-from tts import load_engine, SAMPLE_RATE  # noqa: E402
+from tts import load_engine  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -92,7 +92,10 @@ class LectureSession:
         self.lecture = lecture
         self.tts = load_engine()
 
-        self.source = rtc.AudioSource(SAMPLE_RATE, 1)
+        # Engines differ: Piper is 22.05 kHz, XTTS is 24 kHz. Publishing at the
+        # wrong rate does not fail — it just makes the lecturer sound wrong.
+        self.sample_rate = self.tts.sample_rate
+        self.source = rtc.AudioSource(self.sample_rate, 1)
         self.track = rtc.LocalAudioTrack.create_audio_track("lecturer", self.source)
 
         self.interrupted = asyncio.Event()   # set by the Listener on a barge-in
@@ -101,13 +104,19 @@ class LectureSession:
         # What the student actually confirmed (possibly edited). "" means they cancelled.
         self.confirmed: asyncio.Queue[str] = asyncio.Queue()
         self.speaking = False
+        self.closed = False          # the student left; stop talking to an empty room
 
     # -- outbound messages to the browser --------------------------------------
 
     async def send(self, message: dict) -> None:
-        await self.room.local_participant.publish_data(
-            json.dumps(message).encode("utf-8"), reliable=True
-        )
+        if self.closed:
+            return
+        try:
+            await self.room.local_participant.publish_data(
+                json.dumps(message).encode("utf-8"), reliable=True
+            )
+        except Exception:
+            self.closed = True
 
     # -- speaking ---------------------------------------------------------------
 
@@ -118,14 +127,23 @@ class LectureSession:
             for chunk in self.tts.synthesize(text):
                 if interruptible and self.interrupted.is_set():
                     return False  # drop the rest of this sentence immediately
+                if self.closed:
+                    return False
                 pcm = (np.clip(chunk, -1.0, 1.0) * 32767).astype(np.int16)
                 frame = rtc.AudioFrame(
                     data=pcm.tobytes(),
-                    sample_rate=SAMPLE_RATE,
+                    sample_rate=self.sample_rate,
                     num_channels=1,
                     samples_per_channel=len(pcm),
                 )
-                await self.source.capture_frame(frame)
+                try:
+                    await self.source.capture_frame(frame)
+                except Exception as exc:
+                    # The student closed the tab mid-sentence. Stop talking to an
+                    # empty room rather than crashing the worker.
+                    print(f"[lecture] room is gone, stopping: {exc}")
+                    self.closed = True
+                    return False
             return True
         finally:
             self.speaking = False
@@ -139,7 +157,7 @@ class LectureSession:
         segments = self.lecture.segments
         position = self.lecture.position
 
-        while position.segment < len(segments):
+        while position.segment < len(segments) and not self.closed:
             segment = segments[position.segment]
 
             # Flip the slide as the segment begins.
@@ -148,9 +166,11 @@ class LectureSession:
 
             sentences = split_sentences(segment["text"])
 
-            while position.sentence < len(sentences):
+            while position.sentence < len(sentences) and not self.closed:
                 finished = await self.speak(sentences[position.sentence])
 
+                if self.closed:
+                    break
                 if not finished:
                     # INTERRUPTED: the student spoke. Keep `position` exactly where
                     # it is, so we repeat this sentence from its start afterwards.
