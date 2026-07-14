@@ -1,0 +1,33 @@
+{
+  "lectureId": "week-2",
+  "title": "Core Concepts",
+  "segments": [
+    {
+      "slide": 1,
+      "text": "This week we build the vocabulary of the field. These are the terms you will meet again in every later chapter, so it is worth being precise about what each one means.",
+      "citations": [
+        {
+          "page": 4
+        }
+      ]
+    },
+    {
+      "slide": 2,
+      "text": "The first main idea is stated plainly in the text, followed by a worked example. Pay attention to the boundaries: the book is careful about where this applies and where it does not.",
+      "citations": [
+        {
+          "page": 5
+        }
+      ]
+    },
+    {
+      "slide": 3,
+      "text": "Finally, a word on the mistake most readers make at this point. It is a tempting one, and the book takes some trouble to correct it.",
+      "citations": [
+        {
+          "page": 6
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "lectureId": "week-4",
+  "title": "Review and Synthesis",
+  "segments": [
+    {
+      "slide": 1,
+      "text": "In this last lecture before the midterm we pull the threads together. There is a single idea running through weeks one to three, and seeing it makes the whole course easier.",
+      "citations": [
+        {
+          "page": 10
+        }
+      ]
+    },
+    {
+      "slide": 2,
+      "text": "Here is a problem that uses everything so far. We will solve it step by step, and I will point out where each week's material comes in.",
+      "citations": [
+        {
+          "page": 11
+        }
+      ]
+    },
+    {
+      "slide": 3,
+      "text": "To prepare for the midterm, focus on what is examinable, revise from the book rather than your notes alone, and re-read the sections we cited each week.",
+      "citations": [
+        {
+          "page": 12
+        }
+      ]
+    }
+  ]
+}

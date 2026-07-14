@@ -1,0 +1,33 @@
+{
+  "lectureId": "week-3",
+  "title": "Applying the Concepts",
+  "segments": [
+    {
+      "slide": 1,
+      "text": "Now we move from theory to practice. There is one step that trips most people up, and we will walk through a small case study that shows it clearly.",
+      "citations": [
+        {
+          "page": 7
+        }
+      ]
+    },
+    {
+      "slide": 2,
+      "text": "Here is the same idea in a different setting. Notice what stays the same and what has to change. That distinction is the whole point of this chapter.",
+      "citations": [
+        {
+          "page": 8
+        }
+      ]
+    },
+    {
+      "slide": 3,
+      "text": "Before you finish, check your work. The book lists the signs that an answer has gone wrong, and recommends a way to verify it.",
+      "citations": [
+        {
+          "page": 9
+        }
+      ]
+    }
+  ]
+}

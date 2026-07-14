@@ -15,8 +15,8 @@ next-env.d.ts
 # uploaded books (user data)
 uploads/
 
-# generated lecture content — see MVP-1 PROMPT §11 (M3 decision: regenerate, don't commit)
-lectures/
+# lecture content is premade and committed (see lectures/)
+
 
 # models / caches
 models/
