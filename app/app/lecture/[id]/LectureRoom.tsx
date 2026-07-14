@@ -23,6 +23,8 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
+import MicMeter from "./MicMeter";
+import TranscriptReview from "./TranscriptReview";
 
 /**
  * The live lecture room.
@@ -35,12 +37,19 @@ import MicOffIcon from "@mui/icons-material/MicOff";
  *   Listener — hears the student, and interrupts the Lecturer when they speak
  */
 
-type AgentState = "connecting" | "lecturing" | "listening" | "answering" | "ended";
+type AgentState =
+  | "connecting"
+  | "lecturing"
+  | "listening"
+  | "review"
+  | "answering"
+  | "ended";
 
 const STATE_LABEL: Record<AgentState, string> = {
   connecting: "Connecting…",
   lecturing: "Lecturer speaking",
   listening: "Listening to you…",
+  review: "Paused — check your question",
   answering: "Answering your question",
   ended: "Lecture finished",
 };
@@ -49,6 +58,7 @@ const STATE_COLOR: Record<AgentState, "default" | "primary" | "secondary" | "suc
   connecting: "default",
   lecturing: "primary",
   listening: "secondary",
+  review: "secondary",
   answering: "secondary",
   ended: "success",
 };
@@ -59,16 +69,21 @@ export default function LectureRoom({ lectureId }: Props) {
   const [room] = useState(() => new Room({ adaptiveStream: true }));
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [muted, setMuted] = useState(false);
+  // The mic starts MUTED: a student should never be broadcast without asking for it,
+  // and an open mic on join would let a cough interrupt the lecture immediately.
+  const [muted, setMuted] = useState(true);
   const [agentState, setAgentState] = useState<AgentState>("connecting");
   const [slide, setSlide] = useState(1);
   const [week, setWeek] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [attendance, setAttendance] = useState<{ status: string; lateMinutes: number } | null>(null);
   const [lastAnswer, setLastAnswer] = useState<{ question: string; answer: string; pages: number[] } | null>(null);
+  // What Whisper heard, waiting for the student to confirm or correct it.
+  const [transcript, setTranscript] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const micRef = useRef<LocalAudioTrack | null>(null);
+  const [mic, setMic] = useState<LocalAudioTrack | null>(null);
 
   const connect = useCallback(async () => {
     try {
@@ -94,6 +109,7 @@ export default function LectureRoom({ lectureId }: Props) {
             if (message.type === "slide" && typeof message.n === "number") setSlide(message.n);
             if (message.type === "state") setAgentState(message.state as AgentState);
             if (message.type === "answer") setLastAnswer(message.payload);
+            if (message.type === "transcript") setTranscript(message.text ?? null);
           } catch {
             // A malformed data message must never take the lecture down.
           }
@@ -102,9 +118,11 @@ export default function LectureRoom({ lectureId }: Props) {
 
       await room.connect(data.url, data.token);
 
-      const mic = await createLocalAudioTrack();
-      micRef.current = mic;
-      await room.localParticipant.publishTrack(mic);
+      const track = await createLocalAudioTrack();
+      micRef.current = track;
+      setMic(track);
+      await track.mute();            // published, but silent until the student unmutes
+      await room.localParticipant.publishTrack(track);
 
       setConnected(true);
       setAgentState("lecturing");
@@ -120,16 +138,24 @@ export default function LectureRoom({ lectureId }: Props) {
     };
   }, [connect, room]);
 
+  async function reply(message: Record<string, unknown>) {
+    await room.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify(message)),
+      { reliable: true }
+    );
+    setTranscript(null);
+  }
+
   async function toggleMute() {
-    const mic = micRef.current;
-    if (!mic) return;
+    const track = micRef.current;
+    if (!track) return;
     // Muted means the Listener agent cannot hear us, so the lecture is never
     // interrupted — that is the whole point of the button.
     if (muted) {
-      await mic.unmute();
+      await track.unmute();
       setMuted(false);
     } else {
-      await mic.mute();
+      await track.mute();
       setMuted(true);
     }
   }
@@ -196,9 +222,17 @@ export default function LectureRoom({ lectureId }: Props) {
         </CardContent>
       </Card>
 
+      <TranscriptReview
+        transcript={transcript}
+        onSend={(question) => reply({ type: "question", text: question })}
+        onCancel={() => reply({ type: "cancel" })}
+      />
+
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={2}>
+            <MicMeter track={mic} muted={muted} />
+
             <Grid container spacing={2}>
               <Grid>
                 <Button
@@ -224,7 +258,7 @@ export default function LectureRoom({ lectureId }: Props) {
             </Grid>
             <Typography variant="body2" color="text.secondary">
               {muted
-                ? "Your microphone is off. The lecturer will not be interrupted."
+                ? "Your microphone is off. Unmute it to ask a question."
                 : "Just speak — the lecturer will stop, answer from the book, and carry on."}
             </Typography>
           </Stack>

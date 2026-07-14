@@ -9,12 +9,16 @@ and falls back to Piper, which is fast on CPU. The swap is never silent.
 from __future__ import annotations
 
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Iterator
 
 import numpy as np
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from common.device import device, describe  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -39,7 +43,12 @@ class CoquiTTS(TTSEngine):
     def __init__(self) -> None:
         from TTS.api import TTS as CoquiAPI  # provided by the maintained `coqui-tts` package
 
-        self.model = CoquiAPI("tts_models/multilingual/multi-dataset/xtts_v2", progress_bar=False)
+        # XTTS is far too slow to lecture in real time on a CPU; on a GPU it is
+        # comfortably faster than speech.
+        self.model = CoquiAPI(
+            "tts_models/multilingual/multi-dataset/xtts_v2", progress_bar=False
+        ).to(device())
+        print(f"[tts] XTTS-v2 loaded on {describe()}")
         self.speaker = os.getenv("TTS_SPEAKER", "Ana Florence")
         self.language = os.getenv("TTS_LANGUAGE", "en")
 

@@ -38,6 +38,7 @@ import numpy as np
 from dotenv import load_dotenv
 from livekit import agents, rtc
 
+from common.device import whisper_settings, describe  # noqa: E402
 from qa import answer_question  # noqa: E402
 from tts import load_engine, SAMPLE_RATE  # noqa: E402
 
@@ -49,6 +50,7 @@ STT_MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "base")
 
 SPEECH_TRIGGER_MS = 300     # this much speech from the student = a barge-in
 SILENCE_END_MS = 800        # this much silence = they have finished asking
+REVIEW_TIMEOUT_S = 120      # how long we hold the lecture while they edit the transcript
 
 
 # ---------------------------------------------------------------- lecture script
@@ -94,7 +96,10 @@ class LectureSession:
         self.track = rtc.LocalAudioTrack.create_audio_track("lecturer", self.source)
 
         self.interrupted = asyncio.Event()   # set by the Listener on a barge-in
-        self.question: asyncio.Queue[str] = asyncio.Queue()
+        # What Whisper heard. It is shown in the browser for the student to correct.
+        self.heard: asyncio.Queue[str] = asyncio.Queue()
+        # What the student actually confirmed (possibly edited). "" means they cancelled.
+        self.confirmed: asyncio.Queue[str] = asyncio.Queue()
         self.speaking = False
 
     # -- outbound messages to the browser --------------------------------------
@@ -165,9 +170,28 @@ class LectureSession:
         await self.send({"type": "state", "state": "listening"})
 
         try:
-            question = await asyncio.wait_for(self.question.get(), timeout=20)
+            heard = await asyncio.wait_for(self.heard.get(), timeout=20)
         except asyncio.TimeoutError:
             # They made a noise but never actually asked anything. Carry on.
+            self.interrupted.clear()
+            return
+
+        # Nothing is asked on the student's behalf. We show them what we heard and
+        # they send it, edit it first, or throw it away.
+        await self.send({"type": "state", "state": "review"})
+        await self.send({"type": "transcript", "text": heard})
+        print(f"[lecture] heard: {heard!r} - waiting for the student to confirm")
+
+        try:
+            question = await asyncio.wait_for(self.confirmed.get(), timeout=REVIEW_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            print("[lecture] no confirmation - resuming the lecture")
+            await self.send({"type": "transcript", "text": None})
+            self.interrupted.clear()
+            return
+
+        if not question.strip():          # they cancelled
+            print("[lecture] question cancelled")
             self.interrupted.clear()
             return
 
@@ -199,7 +223,9 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack) -> None:
     """The Listener agent: VAD for barge-in, faster-whisper for the question."""
     from faster_whisper import WhisperModel
 
-    model = WhisperModel(STT_MODEL_SIZE, device="cpu", compute_type="int8")
+    stt_device, compute_type = whisper_settings()
+    model = WhisperModel(STT_MODEL_SIZE, device=stt_device, compute_type=compute_type)
+    print(f"[listener] faster-whisper '{STT_MODEL_SIZE}' on {describe()} ({compute_type})")
 
     stream = rtc.AudioStream(track, sample_rate=16000, num_channels=1)
     buffer: list[np.ndarray] = []
@@ -239,7 +265,7 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack) -> None:
                 text = " ".join(seg.text.strip() for seg in transcribed).strip()
 
                 if text:
-                    await session.question.put(text)
+                    await session.heard.put(text)
                 else:
                     session.interrupted.clear()
 
@@ -261,6 +287,18 @@ async def entrypoint(ctx: agents.JobContext) -> None:
     def on_track(track: rtc.Track, *_: object) -> None:
         if track.kind == rtc.TrackKind.KIND_AUDIO:
             asyncio.create_task(listen(session, track))
+
+    @ctx.room.on("data_received")
+    def on_data(packet: rtc.DataPacket) -> None:
+        # The student pressed Send (possibly after editing) or Cancel.
+        try:
+            message = json.loads(packet.data.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return
+        if message.get("type") == "question":
+            session.confirmed.put_nowait(str(message.get("text", "")))
+        elif message.get("type") == "cancel":
+            session.confirmed.put_nowait("")
 
     await session.run()
 

@@ -31,13 +31,27 @@ type Book = {
 const BOOK_COLUMNS = "id, filename, title, pages, status, error";
 
 export async function GET() {
-  const book = await queryOne<Book>(
-    `SELECT ${BOOK_COLUMNS} FROM books ORDER BY id DESC LIMIT 1`
+  const books = await query<Book & { uploaded_at: string }>(
+    `SELECT ${BOOK_COLUMNS}, uploaded_at FROM books ORDER BY id DESC`
   );
-  return Response.json({ book, ragConfigured: Boolean(RAG_MCP_URL) });
+  return Response.json({
+    books,
+    book: books[0] ?? null,
+    ragConfigured: Boolean(RAG_MCP_URL),
+  });
 }
 
 export async function POST(request: NextRequest) {
+  // A course is built from ONE book. Once it is in, uploading is closed — the page
+  // becomes a library view, and this guard means the API agrees with it.
+  const existing = await queryOne<{ count: string }>("SELECT COUNT(*)::text AS count FROM books");
+  if (Number(existing?.count ?? 0) > 0) {
+    return Response.json(
+      { error: "This course already has its book. Start a new course to study a different one." },
+      { status: 409 }
+    );
+  }
+
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
 

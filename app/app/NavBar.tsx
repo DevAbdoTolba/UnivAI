@@ -9,7 +9,7 @@ import Stack from "@mui/material/Stack";
 import Link from "next/link";
 
 const LINKS = [
-  { href: "/upload", label: "Upload Book" },
+  { href: "/upload", label: "Books" },
   { href: "/schedule", label: "Schedule" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/admin", label: "Admin" },
