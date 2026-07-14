@@ -1,0 +1,19 @@
+# Shared Python deps for both services (rag-mcp + voice-agent).
+# Install:  python -m venv .venv && .venv/Scripts/activate && pip install -r services/requirements.txt
+
+# --- common ---
+psycopg[binary]>=3.2
+python-dotenv>=1.0
+
+# --- rag-mcp ---
+mcp>=1.2                    # MCP server (search_book, get_pages)
+pypdf>=5.1                  # PDF text + page extraction
+sentence-transformers>=3.3  # local embeddings (all-MiniLM-L6-v2, 384-dim)
+pgvector>=0.3
+
+# --- voice-agent ---
+livekit-agents>=0.12
+livekit-plugins-silero>=0.7          # VAD
+faster-whisper>=1.1                  # local STT
+coqui-tts>=0.25                      # maintained Coqui fork (coqui-ai/TTS is archived)
+piper-tts>=1.2                       # local TTS fallback, gated on M5 latency test

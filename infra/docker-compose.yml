@@ -1,0 +1,22 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: univai-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: univai
+      POSTGRES_PASSWORD: univai
+      POSTGRES_DB: univai
+    ports:
+      # Host 5433, not 5432: another Postgres already owns 5432 on the dev machine.
+      - "5433:5432"
+    volumes:
+      - univai-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U univai -d univai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  univai-pgdata:
