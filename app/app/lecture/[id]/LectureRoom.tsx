@@ -25,6 +25,7 @@ import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
 import MicMeter from "./MicMeter";
 import TranscriptReview from "./TranscriptReview";
+import { formatLateness } from "@/lib/time";
 
 /**
  * The live lecture room.
@@ -225,7 +226,7 @@ export default function LectureRoom({ lectureId }: Props) {
                 variant="outlined"
                 label={
                   attendance.status === "late"
-                    ? `joined ${attendance.lateMinutes} min late`
+                    ? `joined ${formatLateness(attendance.lateMinutes)}`
                     : "joined on time"
                 }
               />

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Dialog from "@mui/material/Dialog";
@@ -19,12 +18,21 @@ import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
+import {
+  formatCountdown,
+  formatDateTime,
+  formatLateness,
+  formatRelative,
+  useVirtualClock,
+} from "@/lib/time";
 
 type Lecture = {
   id: number;
   week: number;
   title: string;
   startsAt: string;
+  joinCutoffAt: string;
+  endsAt: string;
   state: "upcoming" | "live" | "done";
   joinable: boolean;
   completed: boolean;
@@ -33,11 +41,7 @@ type Lecture = {
   attendance: { status: string; joinedAt: string | null; lateMinutes: number } | null;
 };
 
-const STATE_COLOR = {
-  live: "success",
-  upcoming: "default",
-  done: "default",
-} as const;
+const STATE_COLOR = { live: "success", upcoming: "default", done: "default" } as const;
 
 const ATTENDANCE_COLOR: Record<string, "success" | "warning" | "error" | "default"> = {
   on_time: "success",
@@ -46,9 +50,27 @@ const ATTENDANCE_COLOR: Record<string, "success" | "warning" | "error" | "defaul
   upcoming: "default",
 };
 
+/** The one line that tells you what to do about this lecture right now. */
+function urgency(lecture: Lecture, now: Date | null): string {
+  if (!now) return "";
+  const ms = (iso: string) => new Date(iso).getTime() - now.getTime();
+
+  if (lecture.completed) return "You finished this lecture.";
+  if (lecture.state === "upcoming") return `Starts ${formatRelative(lecture.startsAt, now)}`;
+
+  if (lecture.state === "live") {
+    const toCutoff = ms(lecture.joinCutoffAt);
+    if (toCutoff > 0) return `Doors close in ${formatCountdown(toCutoff)}`;
+    return "The doors have closed for this lecture.";
+  }
+
+  return `Ended ${formatRelative(lecture.endsAt, now)}`;
+}
+
 export default function SchedulePage() {
   const [lectures, setLectures] = useState<Lecture[] | null>(null);
   const [selected, setSelected] = useState<Lecture | null>(null);
+  const now = useVirtualClock();
 
   const load = useCallback(async () => {
     const res = await fetch("/api/lectures", { cache: "no-store" });
@@ -58,17 +80,36 @@ export default function SchedulePage() {
 
   useEffect(() => {
     load();
+    const refresh = setInterval(load, 15_000);
+    return () => clearInterval(refresh);
   }, [load]);
 
   if (!lectures) return <CircularProgress />;
 
+  const live = lectures.find((lecture) => lecture.state === "live" && lecture.joinable);
+  const next = lectures.find((lecture) => lecture.state === "upcoming");
+
   return (
     <Stack spacing={3}>
       <Typography variant="h4">Schedule</Typography>
-      <Typography variant="body1" color="text.secondary">
-        Four lectures, one a week. Click a lecture for its details. Times follow the
-        virtual clock, so the Admin page can jump you to any week.
-      </Typography>
+
+      {live ? (
+        <Alert
+          severity="success"
+          action={
+            <Button component={Link} href={`/lecture/${live.id}`} color="inherit" variant="outlined">
+              Join now
+            </Button>
+          }
+        >
+          Week {live.week} is live — {urgency(live, now).toLowerCase()}.
+        </Alert>
+      ) : next ? (
+        <Alert severity="info">
+          Next lecture: week {next.week}, {formatRelative(next.startsAt, now)} (
+          {formatDateTime(next.startsAt)}).
+        </Alert>
+      ) : null}
 
       <Card variant="outlined">
         <List>
@@ -76,7 +117,7 @@ export default function SchedulePage() {
             <ListItemButton key={lecture.id} onClick={() => setSelected(lecture)}>
               <ListItemText
                 primary={`Week ${lecture.week} — ${lecture.title}`}
-                secondary={new Date(lecture.startsAt).toUTCString()}
+                secondary={`${formatDateTime(lecture.startsAt)} · ${urgency(lecture, now)}`}
               />
               <Grid container spacing={1}>
                 {lecture.completed ? (
@@ -91,8 +132,8 @@ export default function SchedulePage() {
                       color={ATTENDANCE_COLOR[lecture.attendance.status] ?? "default"}
                       label={
                         lecture.attendance.status === "late"
-                          ? `late ${lecture.attendance.lateMinutes} min`
-                          : lecture.attendance.status
+                          ? formatLateness(lecture.attendance.lateMinutes)
+                          : lecture.attendance.status.replace("_", " ")
                       }
                     />
                   </Grid>
@@ -112,18 +153,17 @@ export default function SchedulePage() {
       </Card>
 
       <Dialog open={Boolean(selected)} onClose={() => setSelected(null)} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {selected ? `Week ${selected.week} — ${selected.title}` : ""}
-        </DialogTitle>
+        <DialogTitle>{selected ? `Week ${selected.week} — ${selected.title}` : ""}</DialogTitle>
         <DialogContent dividers>
           {selected ? (
             <Stack spacing={2}>
               <Stack spacing={1}>
                 <Typography variant="overline" color="text.secondary">
-                  Starts at
+                  When
                 </Typography>
-                <Typography variant="body1">
-                  {new Date(selected.startsAt).toUTCString()}
+                <Typography variant="body1">{formatDateTime(selected.startsAt)}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {urgency(selected, now)}
                 </Typography>
               </Stack>
 
@@ -140,6 +180,12 @@ export default function SchedulePage() {
                 <Grid>
                   <Chip variant="outlined" label={`${selected.slides} slides`} />
                 </Grid>
+                <Grid>
+                  <Chip
+                    variant="outlined"
+                    label={`doors close ${formatDateTime(selected.joinCutoffAt)}`}
+                  />
+                </Grid>
               </Grid>
 
               {selected.blockedMessage ? (
@@ -154,20 +200,14 @@ export default function SchedulePage() {
                 <Typography variant="overline" color="text.secondary">
                   Your attendance
                 </Typography>
-                {selected.attendance ? (
+                {selected.attendance?.joinedAt ? (
                   <Typography variant="body1">
                     {selected.attendance.status === "late"
-                      ? `Joined ${selected.attendance.lateMinutes} minutes late, at ${new Date(
-                          selected.attendance.joinedAt ?? ""
-                        ).toUTCString()}`
-                      : selected.attendance.status === "on_time"
-                        ? `Joined on time, at ${new Date(
-                            selected.attendance.joinedAt ?? ""
-                          ).toUTCString()}`
-                        : selected.attendance.status === "absent"
-                          ? "Absent — you never joined this lecture."
-                          : "Not yet — this lecture has not started."}
+                      ? `You joined ${formatLateness(selected.attendance.lateMinutes)}, at ${formatDateTime(selected.attendance.joinedAt)}.`
+                      : `You joined on time, at ${formatDateTime(selected.attendance.joinedAt)}.`}
                   </Typography>
+                ) : selected.state === "done" ? (
+                  <Typography variant="body1">You never joined this lecture.</Typography>
                 ) : (
                   <Typography variant="body1" color="text.secondary">
                     Nothing recorded yet.
@@ -186,11 +226,7 @@ export default function SchedulePage() {
               href={`/lecture/${selected.id}`}
               disabled={!selected.joinable}
             >
-              {selected.completed
-                ? "Finished"
-                : selected.joinable
-                  ? "Join lecture"
-                  : "Closed"}
+              {selected.completed ? "Finished" : selected.joinable ? "Join lecture" : "Closed"}
             </Button>
           ) : null}
         </DialogActions>

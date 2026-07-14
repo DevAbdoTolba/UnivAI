@@ -17,6 +17,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
+import { formatDateTime, formatRelative, useVirtualClock } from "@/lib/time";
 
 type Book = {
   id: number;
@@ -37,6 +38,7 @@ const STATUS_COLOR: Record<string, "success" | "error" | "warning" | "default"> 
 
 export default function BooksPage() {
   const [books, setBooks] = useState<Book[] | null>(null);
+  const now = useVirtualClock();
   const [ragConfigured, setRagConfigured] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +115,12 @@ export default function BooksPage() {
                     <TableCell>{book.title ?? book.filename}</TableCell>
                     <TableCell>{book.filename}</TableCell>
                     <TableCell align="right">{book.pages || "—"}</TableCell>
-                    <TableCell>{new Date(book.uploaded_at).toUTCString()}</TableCell>
+                    <TableCell>
+                      {formatDateTime(book.uploaded_at)}
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        {formatRelative(book.uploaded_at, now)}
+                      </Typography>
+                    </TableCell>
                     <TableCell>
                       <Chip
                         size="small"

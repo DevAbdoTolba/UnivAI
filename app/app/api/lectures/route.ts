@@ -16,6 +16,8 @@ export async function GET() {
         week: lecture.week,
         title: lecture.title,
         startsAt: lecture.startsAt.toISOString(),
+        joinCutoffAt: lecture.joinCutoffAt.toISOString(),
+        endsAt: lecture.endsAt.toISOString(),
         state: lecture.state,
         joinable: lecture.joinable,
         completed: lecture.completed,

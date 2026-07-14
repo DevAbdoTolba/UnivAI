@@ -13,6 +13,7 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import { formatCountdown, formatDateTime, formatLateness, formatRelative, useVirtualClock } from "@/lib/time";
 
 type Attendance = {
   lectureId: number;
@@ -60,6 +61,7 @@ const STATUS_LABEL: Record<Attendance["status"], string> = {
 
 export default function DashboardPage() {
   const [data, setData] = useState<Data | null>(null);
+  const now = useVirtualClock();
 
   const load = useCallback(async () => {
     const res = await fetch("/api/dashboard", { cache: "no-store" });
@@ -96,10 +98,16 @@ export default function DashboardPage() {
                 <Chip variant="outlined" label={`upcoming: ${summary.upcomingCount}`} />
               </Grid>
               <Grid>
-                <Chip variant="outlined" label={`total late: ${summary.totalLateMinutes} min`} />
+                <Chip
+                  variant="outlined"
+                  label={`total lateness: ${summary.totalLateMinutes ? formatCountdown(summary.totalLateMinutes * 60_000) : "none"}`}
+                />
               </Grid>
               <Grid>
-                <Chip variant="outlined" label={`average late: ${summary.averageLateMinutes} min`} />
+                <Chip
+                  variant="outlined"
+                  label={`average lateness: ${summary.averageLateMinutes ? formatCountdown(summary.averageLateMinutes * 60_000) : "none"}`}
+                />
               </Grid>
             </Grid>
 
@@ -111,7 +119,7 @@ export default function DashboardPage() {
                   <TableCell>Starts at</TableCell>
                   <TableCell>You joined</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell align="right">Late (min)</TableCell>
+                  <TableCell align="right">Lateness</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -119,10 +127,13 @@ export default function DashboardPage() {
                   <TableRow key={record.lectureId}>
                     <TableCell>{record.week}</TableCell>
                     <TableCell>{record.title}</TableCell>
-                    <TableCell>{new Date(record.startsAt).toUTCString()}</TableCell>
                     <TableCell>
-                      {record.joinedAt ? new Date(record.joinedAt).toUTCString() : "—"}
+                      {formatDateTime(record.startsAt)}
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        {formatRelative(record.startsAt, now)}
+                      </Typography>
                     </TableCell>
+                    <TableCell>{formatDateTime(record.joinedAt)}</TableCell>
                     <TableCell>
                       <Chip
                         size="small"
@@ -130,7 +141,9 @@ export default function DashboardPage() {
                         label={STATUS_LABEL[record.status]}
                       />
                     </TableCell>
-                    <TableCell align="right">{record.lateMinutes || "—"}</TableCell>
+                    <TableCell align="right">
+                      {record.lateMinutes ? formatLateness(record.lateMinutes) : "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -33,6 +33,9 @@ export type Lecture = {
   week: number;
   title: string;
   startsAt: Date;
+  /** The doors close here: halfway through. */
+  joinCutoffAt: Date;
+  endsAt: Date;
   /** derived from the VIRTUAL clock, never the wall clock */
   state: "upcoming" | "live" | "done";
   joinable: boolean;
@@ -112,6 +115,8 @@ export async function getLectures(): Promise<Lecture[]> {
       week: row.week,
       title: row.title,
       startsAt,
+      joinCutoffAt: cutoff,
+      endsAt,
       state,
       completed,
       joinable: blockedReason === null,

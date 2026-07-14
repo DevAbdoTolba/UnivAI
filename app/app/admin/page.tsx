@@ -18,6 +18,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { formatCountdown, formatDateTime, formatLateness, formatRelative } from "@/lib/time";
 
 type AdminState = {
   clock: { now: string; offsetMs: number };
@@ -117,12 +118,18 @@ export default function AdminPage() {
 
             <Grid container spacing={1}>
               <Grid>
-                <Chip color="primary" label={`now: ${state?.clock.now ?? "—"}`} />
+                <Chip color="primary" label={`now: ${formatDateTime(state?.clock.now)}`} />
               </Grid>
               <Grid>
                 <Chip
                   variant="outlined"
-                  label={`offset: ${Math.round((state?.clock.offsetMs ?? 0) / 60000)} min`}
+                  label={
+                    state?.clock.offsetMs
+                      ? `${formatCountdown(Math.abs(state.clock.offsetMs))} ${
+                          state.clock.offsetMs > 0 ? "ahead of" : "behind"
+                        } real time`
+                      : "real time"
+                  }
                 />
               </Grid>
             </Grid>
@@ -259,7 +266,7 @@ export default function AdminPage() {
                     <TableCell>Starts at</TableCell>
                     <TableCell>Joined at</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell align="right">Late (min)</TableCell>
+                    <TableCell align="right">Lateness</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -267,10 +274,10 @@ export default function AdminPage() {
                     <TableRow key={record.lectureId}>
                       <TableCell>{record.week}</TableCell>
                       <TableCell>{record.title}</TableCell>
-                      <TableCell>{record.startsAt}</TableCell>
-                      <TableCell>{record.joinedAt ?? "—"}</TableCell>
+                      <TableCell>{formatDateTime(record.startsAt)}</TableCell>
+                      <TableCell>{formatDateTime(record.joinedAt)}</TableCell>
                       <TableCell>{record.status}</TableCell>
-                      <TableCell align="right">{record.lateMinutes}</TableCell>
+                      <TableCell align="right">{record.lateMinutes ? formatLateness(record.lateMinutes) : "—"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -331,7 +338,7 @@ export default function AdminPage() {
                 <TableBody>
                   {state.qaLog.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell>{entry.asked_at}</TableCell>
+                      <TableCell>{formatDateTime(entry.asked_at)}</TableCell>
                       <TableCell>{entry.question}</TableCell>
                       <TableCell>{entry.answer}</TableCell>
                       <TableCell>{entry.model_used ?? "—"}</TableCell>
