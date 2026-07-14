@@ -3,20 +3,20 @@ import { promises as fs } from "fs";
 import path from "path";
 import { query, queryOne } from "@/lib/db";
 import { now } from "@/lib/clock";
+import { runPython, parseJsonLine, REPO_ROOT } from "@/lib/python";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 const MAX_BYTES = 60 * 1024 * 1024;
 const PDF_MAGIC = "%PDF-";
-const REPO_ROOT = path.resolve(process.cwd(), "..");
 
 /**
- * Ingestion is the RAG service's job — it already exists and is owned by the
- * team, outside this repo. This route only validates the file, stores it, and
- * forwards it to RAG_INGEST_URL. It never chunks, embeds, or indexes anything.
+ * Indexing is the RAG service's job — it is already built, owned by the team,
+ * and lives in its own repo. This route validates the file, saves it, and hands
+ * the path to RAG's ingest_file tool over MCP. It never chunks or embeds anything.
  */
-const RAG_INGEST_URL = process.env.RAG_INGEST_URL ?? "";
+const RAG_MCP_URL = process.env.RAG_MCP_URL ?? "";
 
 type Book = {
   id: number;
@@ -27,11 +27,13 @@ type Book = {
   error: string | null;
 };
 
+const BOOK_COLUMNS = "id, filename, title, pages, status, error";
+
 export async function GET() {
   const book = await queryOne<Book>(
-    "SELECT id, filename, title, pages, status, error FROM books ORDER BY id DESC LIMIT 1"
+    `SELECT ${BOOK_COLUMNS} FROM books ORDER BY id DESC LIMIT 1`
   );
-  return Response.json({ book, ragConfigured: Boolean(RAG_INGEST_URL) });
+  return Response.json({ book, ragConfigured: Boolean(RAG_MCP_URL) });
 }
 
 export async function POST(request: NextRequest) {
@@ -62,48 +64,46 @@ export async function POST(request: NextRequest) {
   const uploadsDir = path.join(REPO_ROOT, "uploads");
   await fs.mkdir(uploadsDir, { recursive: true });
   const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-  await fs.writeFile(path.join(uploadsDir, safeName), bytes);
+  const destination = path.join(uploadsDir, safeName);
+  await fs.writeFile(destination, bytes);
 
   // MVP-1 holds exactly one book: a new upload replaces the previous one.
   await query("DELETE FROM books");
   const uploadedAt = await now();
   const created = await queryOne<{ id: number }>(
     "INSERT INTO books (filename, status, uploaded_at) VALUES ($1, $2, $3) RETURNING id",
-    [safeName, RAG_INGEST_URL ? "ingesting" : "pending", uploadedAt]
+    [safeName, RAG_MCP_URL ? "ingesting" : "pending", uploadedAt]
   );
   const bookId = created!.id;
 
-  if (!RAG_INGEST_URL) {
-    // The seam is here and nothing else: set RAG_INGEST_URL in .env when the
-    // team's RAG service is reachable.
+  if (!RAG_MCP_URL) {
     return Response.json({
-      book: await queryOne<Book>("SELECT id, filename, title, pages, status, error FROM books WHERE id = $1", [bookId]),
+      book: await queryOne<Book>(`SELECT ${BOOK_COLUMNS} FROM books WHERE id = $1`, [bookId]),
       ragConfigured: false,
-      note: "Saved. RAG_INGEST_URL is not set, so the book was not sent for indexing.",
+      note: "Saved. RAG_MCP_URL is not set, so the book was not sent for indexing.",
     });
   }
 
-  try {
-    const outbound = new FormData();
-    outbound.append("file", new Blob([new Uint8Array(bytes)], { type: "application/pdf" }), safeName);
+  const result = await runPython("services/rag_ingest.py", [destination]);
+  const payload = parseJsonLine<{ ok: boolean; message?: string; error?: string }>(result.stdout);
 
-    const res = await fetch(RAG_INGEST_URL, { method: "POST", body: outbound });
-    if (!res.ok) throw new Error(`RAG service returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
-
-    const data = (await res.json().catch(() => ({}))) as { title?: string; pages?: number };
-    await query("UPDATE books SET status = 'ready', title = $1, pages = $2 WHERE id = $3", [
-      data.title ?? safeName,
-      data.pages ?? 0,
-      bookId,
-    ]);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : "unknown error";
+  if (!payload?.ok) {
+    const detail = payload?.error ?? result.stderr.trim().split("\n").slice(-2).join(" ");
     await query("UPDATE books SET status = 'failed', error = $1 WHERE id = $2", [detail, bookId]);
-    return Response.json({ error: "The RAG service could not index this book.", detail }, { status: 502 });
+    return Response.json(
+      { error: "The RAG service could not index this book.", detail },
+      { status: 502 }
+    );
   }
 
+  // Their tool answers with prose, e.g. "Successfully ingested x.pdf. Created 5 chunks."
+  const chunks = Number(payload.message?.match(/Created (\d+) chunks/)?.[1] ?? 0);
+  await query("UPDATE books SET status = 'ready', title = $1 WHERE id = $2", [safeName, bookId]);
+
   return Response.json({
-    book: await queryOne<Book>("SELECT id, filename, title, pages, status, error FROM books WHERE id = $1", [bookId]),
+    book: await queryOne<Book>(`SELECT ${BOOK_COLUMNS} FROM books WHERE id = $1`, [bookId]),
     ragConfigured: true,
+    chunks,
+    message: payload.message,
   });
 }

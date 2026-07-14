@@ -19,12 +19,24 @@ from common.db import execute  # noqa: E402
 from common.llm import complete, LLMError  # noqa: E402
 from common.rag_client import search_book, RagUnavailable  # noqa: E402
 
+# The RAG service always returns nearest neighbours — even for a question the book
+# does not cover, a vector search still hands back its closest chunks. So an empty
+# result is NOT how we detect "not in the book": the model has to refuse when the
+# passages it was given do not actually answer the question. Hence the blunt prompt.
+#
+# The model must NOT speak page numbers either: asked to, a small model invents them
+# (observed: it said "page 4" for a passage that came from page 2). The true page comes
+# from the RAG metadata and we append it ourselves, below.
 SYSTEM = (
     "You are a university teaching assistant answering a student mid-lecture. "
     "Use ONLY the textbook passages given to you. Never add outside knowledge. "
-    "Answer in at most three short spoken sentences, and mention the page number. "
-    "If the passages do not answer the question, say so plainly."
+    "The passages are the closest matches found, and they may be irrelevant: if they "
+    "do not actually answer the question, reply exactly 'That is not covered in your "
+    "book.' and nothing else. Otherwise answer in at most three short spoken sentences. "
+    "Never state a page or chunk number — the page reference is added for you."
 )
+
+NOT_COVERED = "that is not covered in your book"
 
 NOT_IN_BOOK = (
     "That is not covered in your book, so I cannot answer it from the material. "
@@ -53,16 +65,23 @@ async def answer_question(question: str, lecture_id: int | None) -> dict:
         _log(lecture_id, question, NOT_IN_BOOK, [], "")
         return {"answer": NOT_IN_BOOK, "pages": [], "model_used": ""}
 
+    # Their reranker can hand back the same chunk twice; feeding duplicates to a small
+    # model just wastes its context.
     passages = []
+    seen: set[str] = set()
     for hit in hits:
+        text = (hit.get("text") or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
         page = hit.get("page")
         if isinstance(page, int):
             pages.append(page)
-        passages.append(f"[page {page}] {hit.get('text', '')}")
+        passages.append(f"[page {page}] {text}")
 
     prompt = (
         f"Student's question: {question}\n\n"
-        f"Textbook passages:\n" + "\n\n".join(passages) + "\n\n"
+        "Textbook passages:\n" + "\n\n".join(passages) + "\n\n"
         "Answer the question using only these passages, in at most three spoken sentences."
     )
 
@@ -74,8 +93,18 @@ async def answer_question(question: str, lecture_id: int | None) -> dict:
         print(f"[qa] all models failed: {exc}")
         answer = TROUBLE
 
-    _log(lecture_id, question, answer, sorted(set(pages)), model_used)
-    return {"answer": answer, "pages": sorted(set(pages)), "model_used": model_used}
+    cited = sorted(set(pages))
+
+    # The page reference is OURS, taken from the RAG metadata — never the model's word.
+    refused = NOT_COVERED in answer.lower()
+    if cited and not refused and answer != TROUBLE:
+        where = f"page {cited[0]}" if len(cited) == 1 else f"pages {cited[0]} and {cited[1]}"
+        answer = f"{answer.rstrip('.')}. You can read that on {where}."
+    if refused:
+        cited = []
+
+    _log(lecture_id, question, answer, cited, model_used)
+    return {"answer": answer, "pages": cited, "model_used": model_used}
 
 
 def _log(lecture_id: int | None, question: str, answer: str, pages: list[int], model: str) -> None:

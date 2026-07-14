@@ -6,3 +6,7 @@
 	path = UnivAI-exam_system
 	url = https://github.com/AhmedSamirKhalaf/UnivAI-exam_system
 	branch = main
+[submodule "UnivAI-Agent"]
+	path = UnivAI-Agent
+	url = https://github.com/AhmeedFatehy/UnivAI-Agent
+	branch = temp

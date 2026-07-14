@@ -18,5 +18,18 @@ services:
       timeout: 5s
       retries: 10
 
+  # The team's RAG service (UnivAI-Agent submodule) stores its vectors here.
+  # This app never touches it — it only calls RAG's MCP server.
+  qdrant:
+    image: qdrant/qdrant
+    container_name: univai-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - univai-qdrant:/qdrant/storage
+
 volumes:
   univai-pgdata:
+  univai-qdrant:
