@@ -8,12 +8,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const [virtualNow, offsetMs] = await Promise.all([now(), getOffsetMs()]);
 
-  const [books, lectures, grades, qaLog, chunkCount] = await Promise.all([
+  const [books, lectures, grades, qaLog] = await Promise.all([
     query("SELECT id, filename, title, pages, status, error, uploaded_at FROM books ORDER BY id DESC"),
     query("SELECT id, week, title, starts_at, status FROM lectures ORDER BY week ASC"),
     query("SELECT id, kind, week, score, max_score, feedback, taken_at FROM grades ORDER BY week ASC NULLS LAST, id ASC"),
     query("SELECT id, lecture_id, question, answer, citations, model_used, asked_at FROM qa_log ORDER BY id DESC LIMIT 50"),
-    query<{ count: string }>("SELECT COUNT(*)::text AS count FROM chunks"),
   ]);
 
   const attendance = await getAttendance();
@@ -21,7 +20,6 @@ export async function GET() {
   return Response.json({
     clock: { now: virtualNow.toISOString(), offsetMs },
     books,
-    chunks: Number(chunkCount[0]?.count ?? 0),
     lectures,
     attendance,
     attendanceSummary: summarize(attendance),

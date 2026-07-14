@@ -22,7 +22,6 @@ import Typography from "@mui/material/Typography";
 type AdminState = {
   clock: { now: string; offsetMs: number };
   books: Array<Record<string, unknown>>;
-  chunks: number;
   lectures: Array<{ id: number; week: number; title: string; starts_at: string; status: string }>;
   attendance: Array<{
     lectureId: number;
@@ -195,7 +194,6 @@ export default function AdminPage() {
                     <TableCell>Title</TableCell>
                     <TableCell align="right">Pages</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell align="right">Chunks</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -211,7 +209,6 @@ export default function AdminPage() {
                           color={book.status === "ready" ? "success" : "default"}
                         />
                       </TableCell>
-                      <TableCell align="right">{state.chunks}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

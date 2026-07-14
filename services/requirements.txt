@@ -1,19 +1,15 @@
-# Shared Python deps for both services (rag-mcp + voice-agent).
+# Python deps for the voice agent. This repo does NOT implement RAG — the team's
+# existing RAG service is consumed over MCP (see services/common/rag_client.py).
 # Install:  python -m venv .venv && .venv/Scripts/activate && pip install -r services/requirements.txt
 
 # --- common ---
 psycopg[binary]>=3.2
 python-dotenv>=1.0
+mcp>=1.2                             # MCP *client*, to call the team's RAG server
 
-# --- rag-mcp ---
-mcp>=1.2                    # MCP server (search_book, get_pages)
-pypdf>=5.1                  # PDF text + page extraction
-sentence-transformers>=3.3  # local embeddings (all-MiniLM-L6-v2, 384-dim)
-pgvector>=0.3
-
-# --- voice-agent ---
+# --- voice-agent (live lecture) ---
 livekit-agents>=0.12
-livekit-plugins-silero>=0.7          # VAD
+livekit-plugins-silero>=0.7          # VAD, for barge-in detection
 faster-whisper>=1.1                  # local STT
-coqui-tts>=0.25                      # maintained Coqui fork (coqui-ai/TTS is archived)
-piper-tts>=1.2                       # local TTS fallback, gated on M5 latency test
+coqui-tts>=0.25                      # local streaming TTS (maintained Coqui fork)
+piper-tts>=1.2                       # local TTS fallback if XTTS is too slow on CPU
