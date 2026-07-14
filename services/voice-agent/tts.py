@@ -1,14 +1,18 @@
 """Local TTS for the Lecturer agent.
 
-Measured on this project's dev machine (RTX 3060 laptop, 6 GB):
+Measured on this project's dev machine (RTX 3060 laptop, 6 GB), warm:
 
-    XTTS-v2 (Coqui)   0.55x realtime  -- 10 s of compute for 5.5 s of speech
-    Piper (lessac)     11x realtime   -- first audio in ~0.2 s
+    XTTS-v2 (Coqui)   0.55x realtime   slower than speech - the lecture stalls
+    Kokoro-82M         1.6x realtime   best voice; needs a sentence of lead time
+    Piper (lessac)      11x realtime   instant, plainer voice
 
-XTTS is slower than speech even on the GPU, so a lecture read by it stalls
-constantly. Piper is the default for that reason. XTTS remains selectable
-(TTS_ENGINE=coqui) because it sounds better, and the latency gate below reports
-the real number rather than letting it fail quietly in a demo.
+Kokoro is the default: it sounds like a person, and 1.6x is fast enough *because
+the lecture script is known in advance* - the worker renders the next sentence
+while the current one is playing (see worker.py), so the lead time is hidden.
+
+Piper is the fallback for anything that must be instant, and for machines where
+Kokoro cannot keep up. The latency gate below reports the real measurement
+rather than letting a demo fail quietly.
 """
 
 from __future__ import annotations
@@ -17,7 +21,6 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 from dotenv import load_dotenv
@@ -29,22 +32,54 @@ ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
 
 # XTTS asks you to accept its licence on stdin. A background worker has no stdin,
-# so without this it hangs forever with no output — which is exactly what happened.
+# so without this it hangs forever with no output.
 os.environ.setdefault("COQUI_TOS_AGREED", "1")
 
-TTS_ENGINE = os.getenv("TTS_ENGINE", "piper").lower()
-LATENCY_GATE_S = float(os.getenv("TTS_LATENCY_GATE_S", "2.0"))
+TTS_ENGINE = os.getenv("TTS_ENGINE", "kokoro").lower()
+LATENCY_GATE_S = float(os.getenv("TTS_LATENCY_GATE_S", "4.0"))
+
 PIPER_MODEL = os.getenv("PIPER_MODEL", "models/piper/en_US-lessac-medium.onnx")
+KOKORO_MODEL = os.getenv("KOKORO_MODEL", "models/kokoro/kokoro-v1.0.onnx")
+KOKORO_VOICES = os.getenv("KOKORO_VOICES", "models/kokoro/voices-v1.0.bin")
+KOKORO_VOICE = os.getenv("KOKORO_VOICE", "af_heart")
+
+
+def _resolve(relative: str) -> Path:
+    path = Path(relative)
+    return path if path.is_absolute() else ROOT / path
 
 
 class TTSEngine:
-    """Yields float32 PCM chunks at self.sample_rate."""
+    """render() returns one sentence of float32 PCM at self.sample_rate."""
 
     name = "none"
-    sample_rate = 22050
+    sample_rate = 24000
 
-    def synthesize(self, text: str) -> Iterator[np.ndarray]:
+    def render(self, text: str) -> np.ndarray:
         raise NotImplementedError
+
+
+class KokoroTTS(TTSEngine):
+    name = "kokoro"
+    sample_rate = 24000
+
+    def __init__(self) -> None:
+        from kokoro_onnx import Kokoro
+
+        model, voices = _resolve(KOKORO_MODEL), _resolve(KOKORO_VOICES)
+        if not model.exists() or not voices.exists():
+            raise RuntimeError(
+                f"Kokoro files missing ({model}, {voices}). Download them from the "
+                "kokoro-onnx releases page, or set TTS_ENGINE=piper."
+            )
+        self.kokoro = Kokoro(str(model), str(voices))
+        self.voice = KOKORO_VOICE
+        print(f"[tts] Kokoro '{self.voice}' ready ({describe()})")
+
+    def render(self, text: str) -> np.ndarray:
+        samples, rate = self.kokoro.create(text, voice=self.voice, speed=1.0, lang="en-us")
+        self.sample_rate = rate
+        return np.asarray(samples, dtype=np.float32)
 
 
 class PiperTTS(TTSEngine):
@@ -53,22 +88,21 @@ class PiperTTS(TTSEngine):
     def __init__(self) -> None:
         from piper import PiperVoice
 
-        model = ROOT / PIPER_MODEL if not Path(PIPER_MODEL).is_absolute() else Path(PIPER_MODEL)
+        model = _resolve(PIPER_MODEL)
         if not model.exists():
             raise RuntimeError(
                 f"Piper voice not found at {model}. Download one from "
                 "huggingface.co/rhasspy/piper-voices and set PIPER_MODEL."
             )
-
         self.voice = PiperVoice.load(str(model), use_cuda=device() == "cuda")
-        # Piper is ~11x realtime on CPU already; CUDA only helps if onnxruntime-gpu
-        # is installed, and it is not required.
         self.sample_rate = self.voice.config.sample_rate
         print(f"[tts] Piper '{model.name}' ready ({self.sample_rate} Hz)")
 
-    def synthesize(self, text: str) -> Iterator[np.ndarray]:
-        for chunk in self.voice.synthesize(text):
-            yield chunk.audio_int16_array.astype(np.float32) / 32768.0
+    def render(self, text: str) -> np.ndarray:
+        chunks = [c.audio_int16_array for c in self.voice.synthesize(text)]
+        if not chunks:
+            return np.zeros(0, dtype=np.float32)
+        return np.concatenate(chunks).astype(np.float32) / 32768.0
 
 
 class CoquiTTS(TTSEngine):
@@ -85,39 +119,38 @@ class CoquiTTS(TTSEngine):
         self.speaker = os.getenv("TTS_SPEAKER", "Ana Florence")
         self.language = os.getenv("TTS_LANGUAGE", "en")
 
-    def synthesize(self, text: str) -> Iterator[np.ndarray]:
-        wav = np.asarray(
-            self.model.tts(text=text, speaker=self.speaker, language=self.language),
-            dtype=np.float32,
-        )
-        # Hand the room ~100 ms at a time so a barge-in can cut in quickly.
-        frame = self.sample_rate // 10
-        for start in range(0, len(wav), frame):
-            yield wav[start : start + frame]
+    def render(self, text: str) -> np.ndarray:
+        wav = self.model.tts(text=text, speaker=self.speaker, language=self.language)
+        return np.asarray(wav, dtype=np.float32)
 
 
-def _time_to_first_chunk(engine: TTSEngine) -> float:
-    started = time.perf_counter()
-    for _ in engine.synthesize("Latency check."):
-        return time.perf_counter() - started
-    return float("inf")
+ENGINES = {"kokoro": KokoroTTS, "piper": PiperTTS, "coqui": CoquiTTS}
 
 
 def load_engine() -> TTSEngine:
     """Load the configured engine and hold it to the latency gate."""
-    engine: TTSEngine = CoquiTTS() if TTS_ENGINE == "coqui" else PiperTTS()
+    factory = ENGINES.get(TTS_ENGINE, KokoroTTS)
+    engine: TTSEngine = factory()
 
-    latency = _time_to_first_chunk(engine)
-    print(f"[tts] {engine.name}: time-to-first-audio {latency:.2f}s (gate {LATENCY_GATE_S}s)")
+    started = time.perf_counter()
+    audio = engine.render("This is a check of the lecturer's voice.")
+    elapsed = time.perf_counter() - started
+    speech = len(audio) / engine.sample_rate
+    ratio = speech / elapsed if elapsed else float("inf")
 
-    if latency > LATENCY_GATE_S and engine.name != "piper":
+    print(
+        f"[tts] {engine.name}: {speech:.1f}s of speech in {elapsed:.2f}s "
+        f"({ratio:.1f}x realtime, gate {LATENCY_GATE_S}s)"
+    )
+
+    if elapsed > LATENCY_GATE_S and engine.name != "piper":
         print(
-            f"[tts] GATE FAILED — {engine.name} cannot keep up with live speech on this "
+            f"[tts] GATE FAILED - {engine.name} is too slow to lecture live on this "
             f"machine. Falling back to Piper. Set TTS_ENGINE=piper to make it permanent."
         )
         try:
             return PiperTTS()
         except Exception as exc:
-            print(f"[tts] Piper unavailable ({exc}); staying on {engine.name} despite the gate.")
+            print(f"[tts] Piper unavailable ({exc}); staying on {engine.name}.")
 
     return engine

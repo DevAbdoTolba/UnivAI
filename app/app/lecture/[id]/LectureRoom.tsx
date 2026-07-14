@@ -80,8 +80,14 @@ export default function LectureRoom({ lectureId }: Props) {
   const [lastAnswer, setLastAnswer] = useState<{ question: string; answer: string; pages: number[] } | null>(null);
   // What Whisper heard, waiting for the student to confirm or correct it.
   const [transcript, setTranscript] = useState<string | null>(null);
+  // Chrome refuses to play audio on a page the user has not interacted with. The
+  // lecture page auto-joins, so there is no gesture and the lecturer is silently
+  // muted. LiveKit reports this, and room.startAudio() fixes it — but only from
+  // inside a real click handler.
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const slidesRef = useRef<HTMLIFrameElement | null>(null);
   const micRef = useRef<LocalAudioTrack | null>(null);
   const [mic, setMic] = useState<LocalAudioTrack | null>(null);
 
@@ -100,7 +106,11 @@ export default function LectureRoom({ lectureId }: Props) {
           // The Lecturer's synthesized voice.
           if (track.kind === Track.Kind.Audio && audioRef.current) {
             track.attach(audioRef.current);
+            audioRef.current.play().catch(() => setAudioBlocked(true));
           }
+        })
+        .on(RoomEvent.AudioPlaybackStatusChanged, () => {
+          setAudioBlocked(!room.canPlaybackAudio);
         })
         .on(RoomEvent.DataReceived, (payload: Uint8Array) => {
           // Slide sync and status, sent by the voice worker.
@@ -132,6 +142,7 @@ export default function LectureRoom({ lectureId }: Props) {
 
       setConnected(true);
       setAgentState("lecturing");
+      if (!room.canPlaybackAudio) setAudioBlocked(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join the lecture.");
     }
@@ -143,6 +154,20 @@ export default function LectureRoom({ lectureId }: Props) {
       room.disconnect();
     };
   }, [connect, room]);
+
+  // The Lecturer agent drives the deck: it sends {slide: n} as each segment
+  // begins. Setting the hash on the iframe's own location navigates it; changing
+  // the src attribute by hash alone often does not.
+  useEffect(() => {
+    const frame = slidesRef.current;
+    if (!frame?.contentWindow) return;
+    try {
+      frame.contentWindow.location.hash = `/${slide}`;
+    } catch {
+      // Different origin (it is not) — fall back to reloading the frame.
+      frame.src = `/slides/week-${week}/index.html#/${slide}`;
+    }
+  }, [slide, week]);
 
   async function reply(message: Record<string, unknown>) {
     await room.localParticipant.publishData(
@@ -211,12 +236,34 @@ export default function LectureRoom({ lectureId }: Props) {
 
       {!connected ? <LinearProgress /> : null}
 
+      {audioBlocked ? (
+        <Alert
+          severity="warning"
+          action={
+            <Button
+              color="inherit"
+              variant="outlined"
+              onClick={async () => {
+                await room.startAudio();
+                await audioRef.current?.play().catch(() => undefined);
+                setAudioBlocked(!room.canPlaybackAudio);
+              }}
+            >
+              Enable sound
+            </Button>
+          }
+        >
+          Your browser has blocked the lecturer&apos;s voice until you click.
+        </Alert>
+      ) : null}
+
       <Card variant="outlined">
         <CardContent>
           {week ? (
             <iframe
               key={week}
-              src={`/slides/week-${week}/index.html#/${slide}`}
+              ref={slidesRef}
+              src={`/slides/week-${week}/index.html#/1`}
               title={`Week ${week} slides`}
               width="100%"
               height="520"

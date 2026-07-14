@@ -120,16 +120,24 @@ class LectureSession:
 
     # -- speaking ---------------------------------------------------------------
 
-    async def speak(self, text: str, interruptible: bool = True) -> bool:
-        """Speak one sentence. Returns False if the student cut in mid-sentence."""
+    async def render(self, text: str) -> np.ndarray:
+        """Synthesis is CPU-bound, so keep it off the event loop."""
+        return await asyncio.to_thread(self.tts.render, text)
+
+    async def play(self, audio: np.ndarray, interruptible: bool = True) -> bool:
+        """Stream one rendered sentence. False = the student cut in, or the room died."""
         self.speaking = True
+        frame_size = self.sample_rate // 10  # 100 ms, so a barge-in cuts in fast
         try:
-            for chunk in self.tts.synthesize(text):
+            for start in range(0, len(audio), frame_size):
                 if interruptible and self.interrupted.is_set():
-                    return False  # drop the rest of this sentence immediately
+                    return False
                 if self.closed:
                     return False
-                pcm = (np.clip(chunk, -1.0, 1.0) * 32767).astype(np.int16)
+
+                pcm = (np.clip(audio[start : start + frame_size], -1.0, 1.0) * 32767).astype(
+                    np.int16
+                )
                 frame = rtc.AudioFrame(
                     data=pcm.tobytes(),
                     sample_rate=self.sample_rate,
@@ -148,6 +156,9 @@ class LectureSession:
         finally:
             self.speaking = False
 
+    async def speak(self, text: str, interruptible: bool = True) -> bool:
+        return await self.play(await self.render(text), interruptible=interruptible)
+
     # -- the state machine ------------------------------------------------------
 
     async def run(self) -> None:
@@ -157,33 +168,51 @@ class LectureSession:
         segments = self.lecture.segments
         position = self.lecture.position
 
-        while position.segment < len(segments) and not self.closed:
-            segment = segments[position.segment]
+        # The whole lecture as a flat list, so we can always see the NEXT sentence.
+        script: list[tuple[int, int, int, str]] = []  # (segment, sentence, slide, text)
+        for s_index, segment in enumerate(segments):
+            for t_index, sentence in enumerate(split_sentences(segment["text"])):
+                script.append((s_index, t_index, segment["slide"], sentence))
 
-            # Flip the slide as the segment begins.
-            if position.sentence == 0:
-                await self.send({"type": "slide", "n": segment["slide"]})
+        # Kokoro renders at ~1.6x realtime — too slow to start a sentence on demand,
+        # but plenty fast to have the NEXT one ready while this one is playing. The
+        # lecture text is known in advance, so we simply stay one sentence ahead.
+        index = 0
+        upcoming: asyncio.Task[np.ndarray] | None = None
+        current_slide = -1
 
-            sentences = split_sentences(segment["text"])
+        while index < len(script) and not self.closed:
+            _, _, slide, sentence = script[index]
 
-            while position.sentence < len(sentences) and not self.closed:
-                finished = await self.speak(sentences[position.sentence])
+            if slide != current_slide:
+                await self.send({"type": "slide", "n": slide})
+                current_slide = slide
 
-                if self.closed:
-                    break
-                if not finished:
-                    # INTERRUPTED: the student spoke. Keep `position` exactly where
-                    # it is, so we repeat this sentence from its start afterwards.
-                    await self.handle_interruption()
-                    await self.send({"type": "state", "state": "lecturing"})
-                    await self.send({"type": "slide", "n": segment["slide"]})
-                    continue
+            audio = await upcoming if upcoming else await self.render(sentence)
+            upcoming = None
 
-                position.sentence += 1
+            # Start rendering the next sentence before speaking this one.
+            if index + 1 < len(script):
+                upcoming = asyncio.create_task(self.render(script[index + 1][3]))
 
-            position.segment += 1
-            position.sentence = 0
+            if await self.play(audio):
+                index += 1
+                continue
 
+            if self.closed:
+                break
+
+            # INTERRUPTED. The prefetched sentence is still the right one to say
+            # next, but we repeat THIS sentence from its start, so drop it.
+            if upcoming:
+                upcoming.cancel()
+                upcoming = None
+
+            await self.handle_interruption()
+            await self.send({"type": "state", "state": "lecturing"})
+            current_slide = -1          # re-announce the slide after the detour
+
+        position.segment = len(segments)
         await self.send({"type": "state", "state": "ended"})
 
     async def handle_interruption(self) -> None:
