@@ -4,6 +4,7 @@ import path from "path";
 import { query, queryOne } from "@/lib/db";
 import { now } from "@/lib/clock";
 import { runPython, parseJsonLine, REPO_ROOT } from "@/lib/python";
+import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 600;
@@ -16,7 +17,7 @@ const PDF_MAGIC = "%PDF-";
  * and lives in its own repo. This route validates the file, saves it, and hands
  * the path to RAG's ingest_file tool over MCP. It never chunks or embeds anything.
  */
-const RAG_MCP_URL = process.env.RAG_MCP_URL ?? "";
+const RAG_MCP_URL = env.RAG_MCP_URL;
 
 type Book = {
   id: number;

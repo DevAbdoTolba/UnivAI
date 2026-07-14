@@ -36,10 +36,12 @@ for (const week of weeks) {
   }
   const outDir = path.join(OUT, week);
   console.log(`Building ${week} → app/public/slides/${week}/`);
-  execSync(
-    `npx --yes @slidev/cli build "${deck}" --out "${outDir}" --base "/slides/${week}/"`,
-    { stdio: "inherit", cwd: ROOT }
-  );
+  // Use the locally installed CLI: `npx --yes` cannot install the theme
+  // non-interactively, and fails with "theme not found".
+  execSync(`npx slidev build "${deck}" --out "${outDir}" --base "/slides/${week}/"`, {
+    stdio: "inherit",
+    cwd: ROOT,
+  });
 }
 
 console.log("\nDone. The lecture page will serve these from /slides/week-N/.");

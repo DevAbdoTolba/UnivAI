@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { queryOne } from "@/lib/db";
 import { stampJoin } from "@/lib/attendance";
+import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   );
   if (!lecture) return Response.json({ error: "No such lecture." }, { status: 404 });
 
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  const url = process.env.LIVEKIT_URL ?? process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  const apiKey = env.LIVEKIT_API_KEY;
+  const apiSecret = env.LIVEKIT_API_SECRET;
+  const url = env.LIVEKIT_URL;
 
   if (!apiKey || !apiSecret || !url) {
     return Response.json(

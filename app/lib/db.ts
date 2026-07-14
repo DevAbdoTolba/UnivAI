@@ -1,18 +1,12 @@
 import { Pool } from "pg";
-import { config } from "dotenv";
-import path from "path";
-
-// The single .env lives at the repo root, one level above app/.
-config({ path: path.resolve(process.cwd(), "..", ".env"), quiet: true });
+import { env } from "./env";
 
 const globalForPool = globalThis as unknown as { univaiPool?: Pool };
 
 export const pool =
   globalForPool.univaiPool ??
   new Pool({
-    connectionString:
-      process.env.DATABASE_URL ??
-      "postgresql://univai:univai@localhost:5433/univai",
+    connectionString: env.DATABASE_URL,
   });
 
 if (process.env.NODE_ENV !== "production") globalForPool.univaiPool = pool;
