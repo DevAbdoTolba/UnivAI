@@ -22,18 +22,27 @@ scripts/build-slides.mjs builds the decks to app/public/slides/week-N/
 ## Run it
 
 ```bash
-cp .env.example .env          # then fill in the values below
-docker compose -f infra/docker-compose.yml up -d
-docker exec -i univai-db psql -U univai -d univai < infra/schema.sql
-
-node scripts/build-slides.mjs # build the Slidev decks once
-
-cd app && npm install && npm run dev        # http://localhost:3000
-
-python -m venv .venv                        # the voice worker
-.venv/Scripts/pip install -r services/requirements.txt
-.venv/Scripts/python services/voice-agent/worker.py dev
+make setup     # node deps, python venv, RAG deps, .env
+make up        # Postgres + Qdrant, schema applied
+make dev       # RAG server + app + voice worker, each in its own terminal
 ```
+
+Windows has no `make`. Use the PowerShell twin — same target names:
+
+```powershell
+./run.ps1 setup ; ./run.ps1 up ; ./run.ps1 dev
+```
+
+| Target | Does |
+|---|---|
+| `setup` | Install app deps, create the venv, `uv sync` the RAG submodule, create `.env` |
+| `up` / `down` | Start / stop Postgres + Qdrant (`up` also applies the schema) |
+| `dev` | Everything: infra, then RAG (`:8000`), app (`:3000`), voice worker |
+| `rag` / `app` / `worker` | Run just one of the three, in the foreground |
+| `slides` | Build the Slidev decks into `app/public/slides/` |
+| `reset` | Wipe lectures, attendance, grades and questions; reset the virtual clock |
+| `status` | What is up, and what the virtual clock currently reads |
+| `clean` | Remove the containers **and their volumes** — destroys the DB and the vectors |
 
 Postgres is published on **5433**, not 5432, because 5432 is commonly already taken.
 
