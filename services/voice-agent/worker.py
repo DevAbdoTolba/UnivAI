@@ -87,10 +87,12 @@ def split_sentences(text: str) -> list[str]:
 
 
 class LectureSession:
-    def __init__(self, room: rtc.Room, lecture: Lecture) -> None:
+    def __init__(self, room: rtc.Room, lecture: Lecture, tts) -> None:
         self.room = room
         self.lecture = lecture
-        self.tts = load_engine()
+        # Loaded in prewarm(), before the student joins. Loading it here would
+        # keep them staring at a silent page for a minute.
+        self.tts = tts
 
         # Engines differ: Piper is 22.05 kHz, XTTS is 24 kHz. Publishing at the
         # wrong rate does not fail — it just makes the lecturer sound wrong.
@@ -268,14 +270,13 @@ class LectureSession:
         self.interrupted.clear()
 
 
-async def listen(session: LectureSession, track: rtc.RemoteAudioTrack) -> None:
-    """The Listener agent: VAD for barge-in, faster-whisper for the question."""
-    from faster_whisper import WhisperModel
+async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) -> None:
+    """The Listener agent: VAD for barge-in, faster-whisper for the question.
 
-    stt_device, compute_type = whisper_settings()
-    model = WhisperModel(STT_MODEL_SIZE, device=stt_device, compute_type=compute_type)
-    print(f"[listener] faster-whisper '{STT_MODEL_SIZE}' on {describe()} ({compute_type})")
-
+    Everything heavy here runs in a thread. Loading or running Whisper on the
+    event loop stalls the Lecturer's audio pump, which sounds exactly like the
+    lecture dying twenty seconds in — because it does.
+    """
     stream = rtc.AudioStream(track, sample_rate=16000, num_channels=1)
     buffer: list[np.ndarray] = []
     speech_ms = 0
@@ -310,8 +311,11 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack) -> None:
                 audio = np.concatenate(buffer) if buffer else np.zeros(1, dtype=np.float32)
                 buffer, capturing, speech_ms, silence_ms = [], False, 0, 0
 
-                transcribed, _info = model.transcribe(audio, language="en")
-                text = " ".join(seg.text.strip() for seg in transcribed).strip()
+                def run_stt(samples: np.ndarray) -> str:
+                    segments, _info = model.transcribe(samples, language="en")
+                    return " ".join(seg.text.strip() for seg in segments).strip()
+
+                text = await asyncio.to_thread(run_stt, audio)
 
                 if text:
                     await session.heard.put(text)
@@ -322,6 +326,23 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack) -> None:
             speech_ms = 0
 
 
+def prewarm(proc: agents.JobProcess) -> None:
+    """Load the models once, when the worker starts — not when a student joins."""
+    proc.userdata["tts"] = load_engine()
+
+    from faster_whisper import WhisperModel
+
+    stt_device, compute_type = whisper_settings()
+    try:
+        model = WhisperModel(STT_MODEL_SIZE, device=stt_device, compute_type=compute_type)
+        print(f"[listener] faster-whisper '{STT_MODEL_SIZE}' on {describe()} ({compute_type})")
+    except Exception as exc:
+        # CUDA whisper needs cuDNN; fall back rather than leave the room deaf.
+        print(f"[listener] {stt_device} unavailable ({exc}); using CPU")
+        model = WhisperModel(STT_MODEL_SIZE, device="cpu", compute_type="int8")
+    proc.userdata["stt"] = model
+
+
 async def entrypoint(ctx: agents.JobContext) -> None:
     await ctx.connect()
 
@@ -330,12 +351,13 @@ async def entrypoint(ctx: agents.JobContext) -> None:
     lecture = Lecture.load(week)
     print(f"[lecture] week {week}: {lecture.title} ({len(lecture.segments)} segments)")
 
-    session = LectureSession(ctx.room, lecture)
+    session = LectureSession(ctx.room, lecture, ctx.proc.userdata["tts"])
+    stt_model = ctx.proc.userdata["stt"]
 
     @ctx.room.on("track_subscribed")
     def on_track(track: rtc.Track, *_: object) -> None:
         if track.kind == rtc.TrackKind.KIND_AUDIO:
-            asyncio.create_task(listen(session, track))
+            asyncio.create_task(listen(session, track, stt_model))
 
     @ctx.room.on("data_received")
     def on_data(packet: rtc.DataPacket) -> None:
@@ -353,4 +375,6 @@ async def entrypoint(ctx: agents.JobContext) -> None:
 
 
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
+    agents.cli.run_app(
+        agents.WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm)
+    )
