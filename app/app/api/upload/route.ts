@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
-import { promises as fs } from "fs";
+import { spawn } from "child_process";
+import { promises as fs, openSync } from "fs";
 import path from "path";
 import { query, queryOne } from "@/lib/db";
 import { now } from "@/lib/clock";
-import { runPython, parseJsonLine, REPO_ROOT } from "@/lib/python";
+import { runPython, parseJsonLine, REPO_ROOT, VENV_PYTHON } from "@/lib/python";
+import { resetExamWorld } from "@/lib/exams";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +15,12 @@ const MAX_BYTES = 60 * 1024 * 1024;
 const PDF_MAGIC = "%PDF-";
 
 /**
- * Indexing is the RAG service's job — it is already built, owned by the team,
- * and lives in its own repo. This route validates the file, saves it, and hands
- * the path to RAG's ingest_file tool over MCP. It never chunks or embeds anything.
+ * The book IS the course. Uploading one (or replacing it) means:
+ *   1. clear the old book out of the RAG and wipe the course state
+ *      (lectures, attendance, grades, the exam system's chapters and banks)
+ *   2. index the new book — the RAG service's job, reached over MCP
+ *   3. generate the 4 weekly lectures + quizzes from it (lecture_gen.py,
+ *      detached — the upload page polls books.progress while it runs)
  */
 const RAG_MCP_URL = env.RAG_MCP_URL;
 
@@ -26,9 +31,10 @@ type Book = {
   pages: number;
   status: string;
   error: string | null;
+  progress: string | null;
 };
 
-const BOOK_COLUMNS = "id, filename, title, pages, status, error";
+const BOOK_COLUMNS = "id, filename, title, pages, status, error, progress";
 
 export async function GET() {
   const books = await query<Book & { uploaded_at: string }>(
@@ -41,17 +47,36 @@ export async function GET() {
   });
 }
 
-export async function POST(request: NextRequest) {
-  // A course is built from ONE book. Once it is in, uploading is closed — the page
-  // becomes a library view, and this guard means the API agrees with it.
-  const existing = await queryOne<{ count: string }>("SELECT COUNT(*)::text AS count FROM books");
-  if (Number(existing?.count ?? 0) > 0) {
-    return Response.json(
-      { error: "This course already has its book. Start a new course to study a different one." },
-      { status: 409 }
-    );
-  }
+/** Everything the old course was: gone. A new book means a new semester. */
+async function resetCourse(): Promise<void> {
+  await query("DELETE FROM grades");
+  await query("DELETE FROM attendance");
+  await query("DELETE FROM qa_log");
+  await query("DELETE FROM lectures");
+  await query("DELETE FROM books");
+  await resetExamWorld();
+}
 
+/** Fire lecture generation and let it outlive this request. */
+function spawnGeneration(pdfPath: string, bookId: number): void {
+  const log = openSync(path.join(REPO_ROOT, "lecture-gen.log"), "a");
+  const child = spawn(
+    VENV_PYTHON,
+    [path.join(REPO_ROOT, "services", "lecture_gen.py"), pdfPath, String(bookId)],
+    {
+      cwd: REPO_ROOT,
+      windowsHide: true,
+      detached: true,
+      stdio: ["ignore", log, log],
+      // Log lines carry generated lecture titles; without this, one character
+      // outside the console codepage kills the whole run with UnicodeEncodeError.
+      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    }
+  );
+  child.unref();
+}
+
+export async function POST(request: NextRequest) {
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
 
@@ -76,49 +101,75 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!RAG_MCP_URL) {
+    return Response.json(
+      { error: "RAG_MCP_URL is not set — the book cannot be indexed, so a course cannot be built." },
+      { status: 503 }
+    );
+  }
+
+  // Replacing? The old book must leave the RAG first, or the lecturer would
+  // keep answering from it. A clear that fails aborts the upload — loudly.
+  const existing = await queryOne<{ count: string }>("SELECT COUNT(*)::text AS count FROM books");
+  if (Number(existing?.count ?? 0) > 0) {
+    const cleared = await runPython("services/rag_admin.py", ["clear"]);
+    const clearedPayload = parseJsonLine<{ ok: boolean; removed?: number; error?: string }>(
+      cleared.stdout
+    );
+    if (!clearedPayload?.ok) {
+      return Response.json(
+        {
+          error: "Could not clear the previous book out of the RAG service.",
+          detail: clearedPayload?.error ?? cleared.stderr.trim().split("\n").slice(-2).join(" "),
+        },
+        { status: 502 }
+      );
+    }
+  }
+  await resetCourse();
+
   const uploadsDir = path.join(REPO_ROOT, "uploads");
   await fs.mkdir(uploadsDir, { recursive: true });
   const safeName = file.name.replace(/[^\w.\-]+/g, "_");
   const destination = path.join(uploadsDir, safeName);
   await fs.writeFile(destination, bytes);
 
-  // MVP-1 holds exactly one book: a new upload replaces the previous one.
-  await query("DELETE FROM books");
   const uploadedAt = await now();
   const created = await queryOne<{ id: number }>(
-    "INSERT INTO books (filename, status, uploaded_at) VALUES ($1, $2, $3) RETURNING id",
-    [safeName, RAG_MCP_URL ? "ingesting" : "pending", uploadedAt]
+    `INSERT INTO books (filename, status, uploaded_at, progress)
+     VALUES ($1, 'ingesting', $2, 'Indexing the book in the RAG service…') RETURNING id`,
+    [safeName, uploadedAt]
   );
   const bookId = created!.id;
 
-  if (!RAG_MCP_URL) {
-    return Response.json({
-      book: await queryOne<Book>(`SELECT ${BOOK_COLUMNS} FROM books WHERE id = $1`, [bookId]),
-      ragConfigured: false,
-      note: "Saved. RAG_MCP_URL is not set, so the book was not sent for indexing.",
-    });
-  }
-
-  const result = await runPython("services/rag_ingest.py", [destination]);
+  // A full textbook takes the RAG service a while to chunk and embed on this
+  // machine — a 600-page book measured ~29 minutes. The MCP client must stay
+  // connected the whole time: their server aborts the ingest on disconnect.
+  const result = await runPython("services/rag_ingest.py", [destination], 60 * 60_000);
   const payload = parseJsonLine<{ ok: boolean; message?: string; error?: string }>(result.stdout);
 
   if (!payload?.ok) {
     const detail = payload?.error ?? result.stderr.trim().split("\n").slice(-2).join(" ");
-    await query("UPDATE books SET status = 'failed', error = $1 WHERE id = $2", [detail, bookId]);
+    await query(
+      "UPDATE books SET status = 'failed', error = $1, progress = NULL WHERE id = $2",
+      [detail, bookId]
+    );
     return Response.json(
       { error: "The RAG service could not index this book.", detail },
       { status: 502 }
     );
   }
 
-  // Their tool answers with prose, e.g. "Successfully ingested x.pdf. Created 5 chunks."
-  const chunks = Number(payload.message?.match(/Created (\d+) chunks/)?.[1] ?? 0);
-  await query("UPDATE books SET status = 'ready', title = $1 WHERE id = $2", [safeName, bookId]);
+  await query(
+    `UPDATE books SET status = 'generating', title = $1,
+        progress = 'Indexed. Generating the 4-week course from the book…' WHERE id = $2`,
+    [safeName, bookId]
+  );
+  spawnGeneration(destination, bookId);
 
   return Response.json({
     book: await queryOne<Book>(`SELECT ${BOOK_COLUMNS} FROM books WHERE id = $1`, [bookId]),
     ragConfigured: true,
-    chunks,
     message: payload.message,
   });
 }

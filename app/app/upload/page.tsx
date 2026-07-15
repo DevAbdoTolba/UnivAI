@@ -26,6 +26,7 @@ type Book = {
   pages: number;
   status: string;
   error: string | null;
+  progress: string | null;
   uploaded_at: string;
 };
 
@@ -33,7 +34,16 @@ const STATUS_COLOR: Record<string, "success" | "error" | "warning" | "default"> 
   ready: "success",
   failed: "error",
   ingesting: "warning",
+  generating: "warning",
   pending: "default",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  ready: "course ready",
+  failed: "failed",
+  ingesting: "indexing",
+  generating: "generating course",
+  pending: "pending",
 };
 
 export default function BooksPage() {
@@ -51,9 +61,19 @@ export default function BooksPage() {
     setRagConfigured(data.ragConfigured);
   }, []);
 
+  const book = books?.[0] ?? null;
+  const working = book?.status === "ingesting" || book?.status === "generating";
+
   useEffect(() => {
     load();
   }, [load]);
+
+  // While the course is being generated, keep the progress line fresh.
+  useEffect(() => {
+    if (!working) return;
+    const poll = setInterval(load, 3_000);
+    return () => clearInterval(poll);
+  }, [working, load]);
 
   async function upload(file: File) {
     setBusy(true);
@@ -75,13 +95,32 @@ export default function BooksPage() {
 
   if (!books) return <CircularProgress />;
 
-  // MVP-1 is one book, one month. Once the book is in, this page is a library view:
-  // there is nothing left to upload, so we do not offer it.
   const hasBook = books.length > 0;
+
+  const chooseButton = (label: string, variant: "contained" | "outlined") => (
+    <Button
+      variant={variant}
+      component="label"
+      disabled={busy || working}
+      color={variant === "outlined" ? "warning" : "primary"}
+    >
+      {label}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        hidden
+        onChange={(event) => {
+          const chosen = event.target.files?.[0];
+          if (chosen) upload(chosen);
+        }}
+      />
+    </Button>
+  );
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">{hasBook ? "Your books" : "Upload your book"}</Typography>
+      <Typography variant="h4">{hasBook ? "Your book" : "Upload your book"}</Typography>
 
       {error ? (
         <Alert severity="error">
@@ -103,29 +142,27 @@ export default function BooksPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>Book</TableCell>
-                  <TableCell>File</TableCell>
                   <TableCell align="right">Pages</TableCell>
                   <TableCell>Uploaded</TableCell>
                   <TableCell>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {books.map((book) => (
-                  <TableRow key={book.id}>
-                    <TableCell>{book.title ?? book.filename}</TableCell>
-                    <TableCell>{book.filename}</TableCell>
-                    <TableCell align="right">{book.pages || "—"}</TableCell>
+                {books.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.title ?? item.filename}</TableCell>
+                    <TableCell align="right">{item.pages || "—"}</TableCell>
                     <TableCell>
-                      {formatDateTime(book.uploaded_at)}
+                      {formatDateTime(item.uploaded_at)}
                       <Typography variant="caption" color="text.secondary" component="div">
-                        {formatRelative(book.uploaded_at, now)}
+                        {formatRelative(item.uploaded_at, now)}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Chip
                         size="small"
-                        color={STATUS_COLOR[book.status] ?? "default"}
-                        label={book.status === "ready" ? "indexed" : book.status}
+                        color={STATUS_COLOR[item.status] ?? "default"}
+                        label={STATUS_LABEL[item.status] ?? item.status}
                       />
                     </TableCell>
                   </TableRow>
@@ -134,46 +171,84 @@ export default function BooksPage() {
             </Table>
           </Card>
 
-          {books.some((book) => book.error) ? (
-            <Alert severity="error">{books.find((book) => book.error)?.error}</Alert>
+          {working ? (
+            <Card variant="outlined">
+              <CardContent>
+                <Stack spacing={1}>
+                  <Typography variant="subtitle1">Building your course</Typography>
+                  <LinearProgress />
+                  <Typography variant="body2" color="text.secondary">
+                    {book?.progress ?? "Working…"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    The book is split into 4 weeks; each gets its slides, narration and
+                    quiz written from its own pages. This takes a few minutes.
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
           ) : null}
 
-          <Alert
-            severity="success"
-            action={
-              <Button component={Link} href="/schedule" size="small">
-                Go to schedule
-              </Button>
-            }
-          >
-            Your semester is built from this book. A course takes one book — to study a
-            different one, start a new course.
-          </Alert>
+          {book?.status === "failed" ? (
+            <Alert
+              severity="error"
+              action={chooseButton("Upload again", "outlined")}
+            >
+              <AlertTitle>Course generation failed</AlertTitle>
+              {book.error ?? "Unknown error."}
+            </Alert>
+          ) : null}
+
+          {book?.status === "ready" ? (
+            <Alert
+              severity="success"
+              action={
+                <Button component={Link} href="/schedule" size="small">
+                  Go to schedule
+                </Button>
+              }
+            >
+              {book.progress ?? "Your semester is built from this book."}
+            </Alert>
+          ) : null}
+
+          {!working ? (
+            <Card variant="outlined">
+              <CardContent>
+                <Stack spacing={2}>
+                  <Typography variant="subtitle1">Study a different book</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Replacing the book starts a NEW course: the old book leaves the RAG,
+                    and the schedule, attendance, grades and quizzes are all reset.
+                  </Typography>
+                  <Stack direction="row" spacing={2}>
+                    {chooseButton("Replace the book", "outlined")}
+                    {busy ? <CircularProgress size={24} /> : null}
+                  </Stack>
+                  {busy ? (
+                    <Stack spacing={1}>
+                      <Typography variant="body2" color="text.secondary">
+                        Clearing the old book and indexing the new one…
+                      </Typography>
+                      <LinearProgress />
+                    </Stack>
+                  ) : null}
+                </Stack>
+              </CardContent>
+            </Card>
+          ) : null}
         </Stack>
       ) : (
         <Stack spacing={3}>
           <Typography variant="body1" color="text.secondary">
-            One textbook PDF. It is handed to the RAG service, which indexes it so lectures
-            and answers can cite the page they came from.
+            One textbook PDF. It is indexed by the RAG service, then the 4-week course —
+            lectures, narration and quizzes — is generated from its pages.
           </Typography>
 
           <Card variant="outlined">
             <CardContent>
               <Stack spacing={2}>
-                <Button variant="contained" component="label" disabled={busy}>
-                  Choose PDF
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    hidden
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) upload(file);
-                    }}
-                  />
-                </Button>
-
+                {chooseButton("Choose PDF", "contained")}
                 {busy ? (
                   <Stack spacing={1}>
                     <Typography variant="body2" color="text.secondary">

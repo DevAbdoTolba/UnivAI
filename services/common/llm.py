@@ -25,7 +25,11 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
 
-TIMEOUT_S = 30
+# A spoken answer (<=180 tokens) must fail FAST into the fallback; a course
+# generation call (~1600 tokens on a small local model) legitimately takes
+# minutes. 30s on the long calls meant every attempt died mid-generation.
+TIMEOUT_QA_S = 30
+TIMEOUT_GENERATION_S = 600
 
 
 class LLMError(RuntimeError):
@@ -38,14 +42,14 @@ class LLMResult:
     model_used: str  # the full "provider:model" string that actually answered
 
 
-def _post_json(url: str, payload: dict, headers: dict[str, str]) -> dict:
+def _post_json(url: str, payload: dict, headers: dict[str, str], timeout: float) -> dict:
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     for key, value in headers.items():
         req.add_header(key, value)
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:400]
@@ -54,7 +58,9 @@ def _post_json(url: str, payload: dict, headers: dict[str, str]) -> dict:
         raise LLMError(str(exc)) from exc
 
 
-def _call_gemini(model: str, system: str, prompt: str) -> str:
+def _call_gemini(
+    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+) -> str:
     key = os.getenv("GEMINI_API_KEY", "")
     if not key:
         raise LLMError("GEMINI_API_KEY is not set")
@@ -66,14 +72,18 @@ def _call_gemini(model: str, system: str, prompt: str) -> str:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "systemInstruction": {"parts": [{"text": system}]},
     }
-    data = _post_json(url, payload, {"x-goog-api-key": key})
+    if max_tokens:
+        payload["generationConfig"] = {"maxOutputTokens": max_tokens}
+    data = _post_json(url, payload, {"x-goog-api-key": key}, timeout)
     try:
         return data["candidates"][0]["content"]["parts"][0]["text"].strip()
     except (KeyError, IndexError) as exc:
         raise LLMError(f"malformed Gemini response: {str(data)[:300]}") from exc
 
 
-def _call_openai(model: str, system: str, prompt: str) -> str:
+def _call_openai(
+    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+) -> str:
     key = os.getenv("OPENAI_API_KEY", "")
     if not key:
         raise LLMError("OPENAI_API_KEY is not set")
@@ -84,10 +94,13 @@ def _call_openai(model: str, system: str, prompt: str) -> str:
             {"role": "user", "content": prompt},
         ],
     }
+    if max_tokens:
+        payload["max_tokens"] = max_tokens
     data = _post_json(
         "https://api.openai.com/v1/chat/completions",
         payload,
         {"Authorization": f"Bearer {key}"},
+        timeout,
     )
     try:
         return data["choices"][0]["message"]["content"].strip()
@@ -95,8 +108,17 @@ def _call_openai(model: str, system: str, prompt: str) -> str:
         raise LLMError(f"malformed OpenAI response: {str(data)[:300]}") from exc
 
 
-def _call_ollama(model: str, system: str, prompt: str) -> str:
+def _call_ollama(
+    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+) -> str:
     base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    options: dict = {"num_predict": max_tokens or 180}
+    if max_tokens:
+        # Generation calls (slides, quizzes) carry pages of book text; the
+        # default 4k window would silently truncate the prompt. They also need
+        # valid JSON back, which a small model produces far more reliably cold.
+        options["num_ctx"] = 8192
+        options["temperature"] = 0.4
     payload = {
         "model": model,
         "system": system,
@@ -105,48 +127,62 @@ def _call_ollama(model: str, system: str, prompt: str) -> str:
         # Answers are <=3 spoken sentences. Uncapped generation on a busy GPU is
         # how a question turns into a 12-minute wait; keep_alive (seconds - some
         # Ollama builds 500 on the string form) stops cold-loading per question.
-        "options": {"num_predict": 180},
+        "options": options,
         "keep_alive": 1800,
     }
-    data = _post_json(f"{base}/api/generate", payload, {})
+    data = _post_json(f"{base}/api/generate", payload, {}, timeout)
     text = data.get("response", "").strip()
     if not text:
         raise LLMError(f"empty Ollama response: {str(data)[:300]}")
+    if max_tokens and data.get("done_reason") == "length":
+        # Generation callers need complete JSON; a reply cut at the token cap
+        # can never parse, so say so instead of letting them puzzle over it.
+        print(f"[llm] WARNING: {model} hit the {max_tokens}-token cap (reply truncated)", flush=True)
     return text
 
 
-def _dispatch(spec: str, system: str, prompt: str) -> str:
+def _dispatch(spec: str, system: str, prompt: str, max_tokens: int | None) -> str:
     if ":" not in spec:
         raise LLMError(f"bad model spec '{spec}' — expected provider:model")
+    timeout = TIMEOUT_GENERATION_S if max_tokens else TIMEOUT_QA_S
     provider, model = spec.split(":", 1)
     provider = provider.strip().lower()
     if provider == "gemini":
-        return _call_gemini(model, system, prompt)
+        return _call_gemini(model, system, prompt, max_tokens, timeout)
     if provider == "openai":
-        return _call_openai(model, system, prompt)
+        return _call_openai(model, system, prompt, max_tokens, timeout)
     if provider == "ollama":
-        return _call_ollama(model, system, prompt)
+        return _call_ollama(model, system, prompt, max_tokens, timeout)
     raise LLMError(f"unknown provider '{provider}' (use gemini|openai|ollama)")
 
 
-def complete(prompt: str, system: str = "You are a helpful teaching assistant.") -> LLMResult:
-    """Run a completion with primary → fallback failover. Logs which model served it."""
+def complete(
+    prompt: str,
+    system: str = "You are a helpful teaching assistant.",
+    max_tokens: int | None = None,
+    force_spec: str | None = None,
+) -> LLMResult:
+    """Run a completion with primary → fallback failover. Logs which model served it.
+
+    force_spec skips the failover order and asks exactly that model — used when a
+    caller has decided the primary's OUTPUT (not its availability) is the problem."""
     primary = os.getenv("LLM_PRIMARY", "").strip()
     fallback = os.getenv("LLM_FALLBACK", "").strip()
-    if not primary:
+    if not primary and not force_spec:
         raise LLMError("LLM_PRIMARY is not set in .env")
 
+    specs = [force_spec] if force_spec else [s for s in (primary, fallback) if s]
     errors: list[str] = []
-    for spec in [s for s in (primary, fallback) if s]:
+    for spec in specs:
         attempts = 2 if spec == primary else 1  # primary gets one retry
         for attempt in range(attempts):
             try:
-                text = _dispatch(spec, system, prompt)
-                print(f"[llm] served by {spec}")
+                text = _dispatch(spec, system, prompt, max_tokens)
+                print(f"[llm] served by {spec}", flush=True)
                 return LLMResult(text=text, model_used=spec)
             except LLMError as exc:
                 errors.append(f"{spec} (try {attempt + 1}): {exc}")
-                print(f"[llm] FAILED {spec} (try {attempt + 1}): {exc}")
+                print(f"[llm] FAILED {spec} (try {attempt + 1}): {exc}", flush=True)
                 if attempt + 1 < attempts:
                     time.sleep(1)
 

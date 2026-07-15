@@ -64,27 +64,39 @@ class RagUnavailable(RuntimeError):
     """The RAG service is not configured or not reachable."""
 
 
+# Retrieval during a LIVE lecture must fail fast — a student is waiting.
+# Ingesting a whole textbook legitimately takes many minutes of embedding.
 RAG_TIMEOUT_S = float(os.getenv("RAG_TIMEOUT_S", "15"))
+# Measured: a 600-page textbook took their embedder ~29 minutes on this box,
+# and their server kills the whole ingest if the client hangs up early.
+RAG_INGEST_TIMEOUT_S = float(os.getenv("RAG_INGEST_TIMEOUT_S", "3300"))
 
 
-async def _call_tool(tool: str, arguments: dict) -> str:
+async def _call_tool(tool: str, arguments: dict, timeout: float | None = None) -> str:
     if not RAG_MCP_URL:
         raise RagUnavailable("RAG_MCP_URL is not set — point it at the team's RAG MCP server")
+    leash = timeout or RAG_TIMEOUT_S
     try:
-        return await asyncio.wait_for(_call_tool_inner(tool, arguments), timeout=RAG_TIMEOUT_S)
+        return await asyncio.wait_for(_call_tool_inner(tool, arguments, leash), timeout=leash)
     except asyncio.TimeoutError as exc:
         # The MCP client reconnect-loops forever against a dead server; the
         # student would wait minutes. Fail fast and let the lecture continue.
-        raise RagUnavailable(f"RAG did not answer within {RAG_TIMEOUT_S:.0f}s") from exc
+        raise RagUnavailable(f"RAG did not answer within {leash:.0f}s") from exc
 
 
-async def _call_tool_inner(tool: str, arguments: dict) -> str:
+async def _call_tool_inner(tool: str, arguments: dict, leash: float) -> str:
 
     # Imported lazily so the app runs before the RAG server is wired up.
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
 
-    async with streamablehttp_client(RAG_MCP_URL) as (read, write, _):
+    # The SSE stream must be allowed to stay SILENT for the whole call: their
+    # server says nothing while it embeds a book (~29 minutes for 600 pages),
+    # and the default 5-minute sse_read_timeout hangs up in the middle — which
+    # makes their server abort the whole ingest.
+    async with streamablehttp_client(
+        RAG_MCP_URL, timeout=leash, sse_read_timeout=leash
+    ) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(tool, arguments)
@@ -138,4 +150,8 @@ async def search_book(query: str, top_k: int = 5) -> list[dict]:
 
 async def ingest_file(absolute_path: str) -> str:
     """Hand a saved book to the RAG service for indexing. It reads the path itself."""
-    return await _call_tool(RAG_TOOL_INGEST, {"file_path": absolute_path, "user_id": RAG_USER_ID})
+    return await _call_tool(
+        RAG_TOOL_INGEST,
+        {"file_path": absolute_path, "user_id": RAG_USER_ID},
+        timeout=RAG_INGEST_TIMEOUT_S,
+    )

@@ -76,3 +76,7 @@ ALTER TABLE attendance ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 ALTER TABLE grades ADD COLUMN IF NOT EXISTS exam_id TEXT UNIQUE;
 ALTER TABLE grades ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE grades ADD COLUMN IF NOT EXISTS report JSONB;
+
+-- Where lecture generation currently is ("Writing lecture 2 of 4…"), shown on
+-- the upload page while the course is being built from the book.
+ALTER TABLE books ADD COLUMN IF NOT EXISTS progress TEXT;

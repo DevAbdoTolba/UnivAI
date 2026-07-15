@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const attendance = await getAttendance();
 
-  // TODO(exam-system): grades come from the UnivAI-exam_system submodule later.
   const grades = await query<{
     id: number;
     kind: string;
@@ -15,8 +14,9 @@ export async function GET() {
     score: string;
     max_score: string;
     feedback: string | null;
+    flagged: boolean;
   }>(
-    "SELECT id, kind, week, score, max_score, feedback FROM grades ORDER BY week ASC NULLS LAST, id ASC"
+    "SELECT id, kind, week, score, max_score, feedback, flagged FROM grades ORDER BY week ASC NULLS LAST, id ASC"
   );
 
   return Response.json({

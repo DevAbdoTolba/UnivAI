@@ -42,6 +42,7 @@ type Data = {
     score: string;
     max_score: string;
     feedback: string | null;
+    flagged: boolean;
   }>;
 };
 
@@ -164,6 +165,7 @@ export default function DashboardPage() {
                     <TableCell>Week</TableCell>
                     <TableCell align="right">Score</TableCell>
                     <TableCell>Feedback</TableCell>
+                    <TableCell>Integrity</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -173,6 +175,14 @@ export default function DashboardPage() {
                       <TableCell>{grade.week ?? "—"}</TableCell>
                       <TableCell align="right">{`${grade.score} / ${grade.max_score}`}</TableCell>
                       <TableCell>{grade.feedback ?? "—"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          color={grade.flagged ? "error" : "success"}
+                          variant="outlined"
+                          label={grade.flagged ? "flagged" : "clean"}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

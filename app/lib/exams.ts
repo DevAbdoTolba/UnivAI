@@ -1,8 +1,10 @@
+import { promises as fs } from "fs";
+import path from "path";
 import { MongoClient, type Db } from "mongodb";
 import { env } from "./env";
 import { query, queryOne } from "./db";
 import { now, HOUR_MS, DAY_MS } from "./clock";
-import { getLectures } from "./lectures";
+import { getLectures, LECTURES_DIR } from "./lectures";
 
 /**
  * Integration with the team's exam system (UnivAI-exam_system, port 3200).
@@ -38,6 +40,69 @@ export type ExamLink = {
   chapters: { week: number; chapter_id: string; title: string }[];
   mid_exam_id: string | null;
 };
+
+/**
+ * Wipe the seeded exam world. Used when the book is replaced: the chapters,
+ * exams and question banks all describe a course that no longer exists.
+ * (Collection names are mongoose's default pluralisation of the model names.)
+ */
+export async function resetExamWorld(): Promise<void> {
+  const db = await mongo();
+  const collections = [
+    "univai_link",
+    "question_banks",
+    "exams",
+    "examsessions",
+    "examchapters",
+    "proctoringevents",
+    "gradehistories",
+    "integrityappeals",
+    "enrollments",
+    "chapters",
+    "curricula",
+  ];
+  await Promise.all(
+    collections.map((name) => db.collection(name).deleteMany({}).catch(() => undefined))
+  );
+}
+
+/**
+ * Copy each week's generated quiz questions (lectures/week-N/quiz.json) into
+ * the exam system's question bank, keyed by chapter id. The exam system draws
+ * real questions from here instead of its placeholder generator.
+ */
+export async function syncQuestionBanks(link: ExamLink): Promise<void> {
+  const db = await mongo();
+  const banks = db.collection("question_banks");
+
+  for (const chapter of link.chapters) {
+    let parsed: { title?: string; questions?: unknown[] } | null = null;
+    try {
+      const raw = await fs.readFile(
+        path.join(LECTURES_DIR, `week-${chapter.week}`, "quiz.json"),
+        "utf-8"
+      );
+      parsed = JSON.parse(raw);
+    } catch {
+      continue; // no generated quiz for this week (yet) — the bank stays as-is
+    }
+    if (!parsed?.questions?.length) continue;
+
+    await banks.updateOne(
+      { chapter_id: chapter.chapter_id },
+      {
+        $set: {
+          chapter_id: chapter.chapter_id,
+          week: chapter.week,
+          title: parsed.title ?? chapter.title,
+          questions: parsed.questions,
+          updated_at: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+  }
+}
 
 /** Seed the exam system's world once, and remember the ids. */
 export async function ensureExamWorld(): Promise<ExamLink> {
@@ -153,6 +218,13 @@ export async function ensureExamWorld(): Promise<ExamLink> {
   return link;
 }
 
+export type ProctoringReport = {
+  suspicion_score?: number;
+  flagged?: boolean;
+  session_status?: string;
+  events?: { type: string; weight: number; occurrences: number; at: string }[];
+};
+
 export type ExamStatus = {
   kind: "quiz" | "mid";
   week: number | null;
@@ -163,6 +235,9 @@ export type ExamStatus = {
   score: string | null;
   maxScore: string | null;
   flagged: boolean;
+  feedback: string | null;
+  /** the proctoring report the exam system sent back — admin view for now */
+  report: ProctoringReport | null;
 };
 
 /** Every exam with its window (virtual clock) and result, for the /exams page. */
@@ -175,7 +250,9 @@ export async function getExamStatuses(): Promise<ExamStatus[]> {
     score: string;
     max_score: string;
     flagged: boolean;
-  }>("SELECT kind, week, score, max_score, flagged FROM grades");
+    feedback: string | null;
+    report: ProctoringReport | null;
+  }>("SELECT kind, week, score, max_score, flagged, feedback, report FROM grades");
 
   const statuses: ExamStatus[] = [];
 
@@ -199,6 +276,8 @@ export async function getExamStatuses(): Promise<ExamStatus[]> {
       score: grade?.score ?? null,
       maxScore: grade?.max_score ?? null,
       flagged: grade?.flagged ?? false,
+      feedback: grade?.feedback ?? null,
+      report: grade?.report ?? null,
     });
   }
 
@@ -223,6 +302,8 @@ export async function getExamStatuses(): Promise<ExamStatus[]> {
       score: grade?.score ?? null,
       maxScore: grade?.max_score ?? null,
       flagged: grade?.flagged ?? false,
+      feedback: grade?.feedback ?? null,
+      report: grade?.report ?? null,
     });
   }
 
@@ -240,6 +321,9 @@ export async function startExam(kind: "quiz" | "mid", week: number | null): Prom
   if (status.state === "submitted") throw new Error("You already submitted this exam.");
 
   const link = await ensureExamWorld();
+  // Push the freshest generated questions into the bank BEFORE the exam system
+  // assembles the exam — this is what makes the quiz be about the lecture.
+  await syncQuestionBanks(link);
 
   if (kind === "quiz") {
     const chapter = link.chapters.find((c) => c.week === week);

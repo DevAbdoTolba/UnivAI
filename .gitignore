@@ -15,8 +15,16 @@ next-env.d.ts
 # uploaded books (user data)
 uploads/
 
-# lecture content is premade and committed (see lectures/)
+# lecture content is generated from the uploaded book (services/lecture_gen.py)
+# and committed so the team can see the current course in git (see lectures/)
 
+# service logs
+worker-out.log
+worker-err.log
+rag-out.log
+rag-err.log
+lecture-gen*.log
+lecture-gen*.err
 
 # models / caches
 models/
