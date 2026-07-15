@@ -170,7 +170,10 @@ class LectureSession:
 
     async def run(self) -> None:
         await self.room.local_participant.publish_track(self.track)
-        await self.send({"type": "state", "state": "lecturing"})
+        # Honesty first: the voice models may still be loading, and claiming
+        # "speaking" over silence reads as a broken page. The room shows
+        # "preparing" until the first sentence's audio actually exists.
+        await self.send({"type": "state", "state": "preparing"})
 
         segments = self.lecture.segments
         position = self.lecture.position
@@ -197,6 +200,10 @@ class LectureSession:
 
             audio = await upcoming if upcoming else await self.render(sentence)
             upcoming = None
+
+            if index == 0:
+                # The first audio is rendered - NOW "speaking" is true.
+                await self.send({"type": "state", "state": "lecturing"})
 
             # Start rendering the next sentence before speaking this one.
             if index + 1 < len(script):

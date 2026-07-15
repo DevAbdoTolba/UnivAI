@@ -44,6 +44,7 @@ import { formatLateness } from "@/lib/time";
 
 type AgentState =
   | "connecting"
+  | "preparing"
   | "lecturing"
   | "asking"
   | "listening"
@@ -53,6 +54,7 @@ type AgentState =
 
 const STATE_LABEL: Record<AgentState, string> = {
   connecting: "Connecting…",
+  preparing: "Loading the lecturer's voice…",
   lecturing: "Lecturer speaking",
   asking: "Lecturer is asking you…",
   listening: "Listening to you…",
@@ -63,6 +65,7 @@ const STATE_LABEL: Record<AgentState, string> = {
 
 const STATE_COLOR: Record<AgentState, "default" | "primary" | "secondary" | "success"> = {
   connecting: "default",
+  preparing: "default",
   lecturing: "primary",
   asking: "secondary",
   listening: "secondary",
@@ -287,7 +290,20 @@ export default function LectureRoom({ lectureId }: Props) {
         </Grid>
       </Stack>
 
-      {!connected ? <LinearProgress /> : null}
+      {/* Anything that is actually LOADING looks like loading — never like a
+          lecturer silently "speaking". First join after a worker restart can
+          take ~30s while the voice models come up. */}
+      {!connected || agentState === "connecting" || agentState === "preparing" ? (
+        <Stack spacing={1}>
+          <LinearProgress />
+          {agentState === "preparing" ? (
+            <Typography variant="body2" color="text.secondary">
+              The lecturer is warming up the voice — this takes up to half a minute
+              on the first join. The lecture starts by itself.
+            </Typography>
+          ) : null}
+        </Stack>
+      ) : null}
 
       {audioBlocked ? (
         <Alert
