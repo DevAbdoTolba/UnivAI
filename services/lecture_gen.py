@@ -312,10 +312,12 @@ def generate_quiz(
     # 1) The bulk of the bank: questions a student who WATCHED the lecture finds
     #    easy — every answer must have been said out loud by the lecturer.
     taught = ask_questions(
-        f'Write {CFG["lecture_qs"]} multiple-choice questions testing ONLY what this lecturer '
-        "actually said. Every correct answer must be stated explicitly in the lecture below - "
-        "a student who watched it should find these easy. Do not ask about anything the "
-        "lecture does not mention.\n\n" + QUESTION_SHAPE +
+        f'Write {CFG["lecture_qs"]} multiple-choice questions testing the TOPICS this lecturer '
+        "covered. A student who understood the lecture must be able to answer every one; do not "
+        "ask about anything the lecture does not cover. Test the concept, not the wording: never "
+        "quote the lecturer's sentences verbatim, never ask what the lecturer 'said' or "
+        "'mentioned', and never turn a sentence into a fill-in-the-blank. Plain questions about "
+        "the subject matter itself.\n\n" + QUESTION_SHAPE +
         "The lecture:\n" + lecture_text(title, segments),
         CFG["lecture_qs"],
         "lecture",
