@@ -230,8 +230,9 @@ def generate_week(week: int, pages: list[tuple[int, str]]) -> dict:
         f'"page" must be one of {valid_pages}.\n\n'
         "Textbook pages:\n" + source_block(pages)
     )
-    # Bigger sizes produce longer JSON: give the reply room to finish.
-    data = ask_json(prompt, LECTURE_SYSTEM, 800 + 260 * CFG["slides"], check_lecture)
+    # Bigger sizes produce longer JSON: give the reply room to finish. A small
+    # model narrates verbosely — an M-size reply got cut at 260 tokens/slide.
+    data = ask_json(prompt, LECTURE_SYSTEM, 800 + 340 * CFG["slides"], check_lecture)
     data["slides"] = data["slides"][: CFG["slides"]]
     for slide in data["slides"]:
         # never trust a model with page numbers: clamp to the pages it was shown
