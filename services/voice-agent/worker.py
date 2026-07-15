@@ -39,6 +39,7 @@ from dotenv import load_dotenv
 from livekit import agents, rtc
 
 from common.device import whisper_settings, describe  # noqa: E402
+from common.sentences import split_sentences  # noqa: E402
 from qa import answer_question  # noqa: E402
 from tts import load_engine  # noqa: E402
 
@@ -70,17 +71,27 @@ class Lecture:
     title: str
     segments: list[dict]
     position: Position = field(default_factory=Position)
+    # Pre-rendered voice (services/prerender_audio.py). When present, the
+    # lecture NEVER touches a TTS model — it plays from disk.
+    audio_dir: Path | None = None
+    audio_rate: int | None = None
 
     @staticmethod
     def load(week: int) -> "Lecture":
-        script = json.loads((LECTURES_DIR / f"week-{week}" / "script.json").read_text("utf-8"))
-        return Lecture(week=week, title=script["title"], segments=script["segments"])
+        folder = LECTURES_DIR / f"week-{week}"
+        script = json.loads((folder / "script.json").read_text("utf-8"))
+        lecture = Lecture(week=week, title=script["title"], segments=script["segments"])
+        meta = folder / "audio" / "meta.json"
+        if meta.exists():
+            lecture.audio_dir = folder / "audio"
+            lecture.audio_rate = int(json.loads(meta.read_text("utf-8"))["sample_rate"])
+        return lecture
 
-
-def split_sentences(text: str) -> list[str]:
-    """TTS speaks a sentence at a time: it lets a barge-in cut in sooner, and it
-    gives us a clean point to resume from."""
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+    def clip(self, segment: int, sentence: int) -> np.ndarray | None:
+        if not self.audio_dir:
+            return None
+        path = self.audio_dir / f"s{segment}-t{sentence}.npy"
+        return np.load(path) if path.exists() else None
 
 
 # ---------------------------------------------------------------- the worker
@@ -90,13 +101,16 @@ class LectureSession:
     def __init__(self, room: rtc.Room, lecture: Lecture, tts) -> None:
         self.room = room
         self.lecture = lecture
-        # Loaded in prewarm(), before the student joins. Loading it here would
-        # keep them staring at a silent page for a minute.
+        # Loaded in prewarm(). May be None on a RAM-starved machine — the
+        # lecture still plays (pre-rendered on disk); only live answers then
+        # need the on-demand Piper fallback in _engine().
         self.tts = tts
+        self._engine_retry = False
 
         # Engines differ: Piper is 22.05 kHz, XTTS is 24 kHz. Publishing at the
         # wrong rate does not fail — it just makes the lecturer sound wrong.
-        self.sample_rate = self.tts.sample_rate
+        # The pre-rendered bank's rate wins: that is most of what gets played.
+        self.sample_rate = lecture.audio_rate or (tts.sample_rate if tts else 24000)
         self.source = rtc.AudioSource(self.sample_rate, 1)
         self.track = rtc.LocalAudioTrack.create_audio_track("lecturer", self.source)
 
@@ -127,9 +141,44 @@ class LectureSession:
 
     # -- speaking ---------------------------------------------------------------
 
+    def _fit(self, audio: np.ndarray, rate: int | None) -> np.ndarray:
+        """Resample to the track's rate (linear — fine for speech)."""
+        if not rate or rate == self.sample_rate or not len(audio):
+            return audio
+        length = int(len(audio) * self.sample_rate / rate)
+        return np.interp(
+            np.linspace(0, len(audio) - 1, length), np.arange(len(audio)), audio
+        ).astype(np.float32)
+
+    async def _engine(self):
+        """The live TTS engine, or the best we can get. Kokoro can fail to load
+        on a starved machine; Piper is 60 MB and almost always fits."""
+        if self.tts is None and not self._engine_retry:
+            self._engine_retry = True
+            try:
+                from tts import PiperTTS
+
+                self.tts = await asyncio.to_thread(PiperTTS)
+                print("[tts] Piper loaded on demand for live speech")
+            except Exception as exc:
+                print(f"[tts] no live engine available: {exc}")
+        return self.tts
+
     async def render(self, text: str) -> np.ndarray:
         """Synthesis is CPU-bound, so keep it off the event loop."""
-        return await asyncio.to_thread(self.tts.render, text)
+        engine = await self._engine()
+        if engine is None:
+            # Nothing can speak. The text still reaches the browser as data.
+            return np.zeros(0, dtype=np.float32)
+        audio = await asyncio.to_thread(engine.render, text)
+        return self._fit(audio, engine.sample_rate)
+
+    async def sentence_audio(self, segment: int, sentence: int, text: str) -> np.ndarray:
+        """Disk first: a pre-rendered sentence costs a read, not a model."""
+        clip = self.lecture.clip(segment, sentence)
+        if clip is not None:
+            return self._fit(clip, self.lecture.audio_rate)
+        return await self.render(text)
 
     async def play(self, audio: np.ndarray, interruptible: bool = True) -> bool:
         """Stream one rendered sentence. False = the student cut in, or the room died."""
@@ -192,22 +241,27 @@ class LectureSession:
         current_slide = -1
 
         while index < len(script) and not self.closed:
-            _, _, slide, sentence = script[index]
+            s_index, t_index, slide, sentence = script[index]
 
             if slide != current_slide:
                 await self.send({"type": "slide", "n": slide})
                 current_slide = slide
 
-            audio = await upcoming if upcoming else await self.render(sentence)
+            audio = (
+                await upcoming
+                if upcoming
+                else await self.sentence_audio(s_index, t_index, sentence)
+            )
             upcoming = None
 
             if index == 0:
-                # The first audio is rendered - NOW "speaking" is true.
+                # The first audio exists - NOW "speaking" is true.
                 await self.send({"type": "state", "state": "lecturing"})
 
-            # Start rendering the next sentence before speaking this one.
+            # Have the next sentence ready before speaking this one.
             if index + 1 < len(script):
-                upcoming = asyncio.create_task(self.render(script[index + 1][3]))
+                next_s, next_t, _, next_text = script[index + 1]
+                upcoming = asyncio.create_task(self.sentence_audio(next_s, next_t, next_text))
 
             finished = await self.play(audio)
             if self.closed:
@@ -245,12 +299,14 @@ class LectureSession:
         self.hand_raised.clear()
 
         await self.send({"type": "state", "state": "asking"})
-        await self.play(self.prompts["ask"], interruptible=False)
+        if "ask" in self.prompts:
+            await self.play(self.prompts["ask"], interruptible=False)
         await self.send({"type": "hand", "state": "acked"})
 
         unmuted = await self._wait_for_unmute(4.0)
         if not unmuted:
-            await self.play(self.prompts["remind"], interruptible=False)
+            if "remind" in self.prompts:
+                await self.play(self.prompts["remind"], interruptible=False)
             unmuted = await self._wait_for_unmute(8.0)
 
         answered = False
@@ -262,7 +318,7 @@ class LectureSession:
                 self.hand_active = False
 
         await self.send({"type": "hand", "state": "lowered"})
-        if not answered:
+        if not answered and "resume" in self.prompts:
             # No question came. Lower the hand and catch the room's attention.
             await self.play(self.prompts["resume"], interruptible=False)
 
@@ -396,22 +452,41 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) ->
 
 
 def prewarm(proc: agents.JobProcess) -> None:
-    """Load the models once, when the worker starts — not when a student joins."""
-    engine = load_engine()
+    """Load the models once, when the worker starts — not when a student joins.
+
+    Every piece here is allowed to fail: lectures play from disk, prompts come
+    pre-rendered from disk, and a missing engine only degrades live answers."""
+    try:
+        engine = load_engine()
+    except Exception as exc:
+        print(f"[tts] engine failed to load ({exc}) - lecture audio comes from disk")
+        engine = None
     proc.userdata["tts"] = engine
 
-    # The raise-hand prompts, personalized and rendered ONCE with the same voice
-    # as the lecture, so the lecturer never changes voice mid-room.
-    student = os.getenv("STUDENT_NAME", "there")
-    prompt_texts = {
-        "ask": f"Yes, {student}? Do you have a question? Unmute your microphone and go ahead.",
-        "remind": f"{student}, your hand is still raised. Unmute whenever you are ready, I am listening.",
-        "resume": "No question? No problem. Alright everyone, eyes back on the slides, and let us continue!",
-    }
-    proc.userdata["prompts"] = {
-        key: engine.render(text) for key, text in prompt_texts.items()
-    }
-    print(f"[lecture] raise-hand prompts rendered for '{student}'")
+    # The raise-hand prompts, personalized, SAME voice as the lecture. Disk
+    # first (prerender_audio.py wrote them); render only if they are missing.
+    prompts: dict[str, np.ndarray] = {}
+    rate = engine.sample_rate if engine else 24000
+    prompts_dir = LECTURES_DIR / "_prompts"
+    meta = prompts_dir / "meta.json"
+    if meta.exists():
+        rate = int(json.loads(meta.read_text("utf-8"))["sample_rate"])
+        for key in ("ask", "remind", "resume"):
+            path = prompts_dir / f"{key}.npy"
+            if path.exists():
+                prompts[key] = np.load(path)
+        print(f"[lecture] raise-hand prompts loaded from disk ({len(prompts)})")
+    elif engine is not None:
+        student = os.getenv("STUDENT_NAME", "there")
+        prompt_texts = {
+            "ask": f"Yes, {student}? Do you have a question? Unmute your microphone and go ahead.",
+            "remind": f"{student}, your hand is still raised. Unmute whenever you are ready, I am listening.",
+            "resume": "No question? No problem. Alright everyone, eyes back on the slides, and let us continue!",
+        }
+        prompts = {key: engine.render(text) for key, text in prompt_texts.items()}
+        print(f"[lecture] raise-hand prompts rendered for '{student}'")
+    proc.userdata["prompts"] = prompts
+    proc.userdata["prompts_rate"] = rate
 
     from faster_whisper import WhisperModel
 
@@ -435,7 +510,11 @@ async def entrypoint(ctx: agents.JobContext) -> None:
     print(f"[lecture] week {week}: {lecture.title} ({len(lecture.segments)} segments)")
 
     session = LectureSession(ctx.room, lecture, ctx.proc.userdata["tts"])
-    session.prompts = ctx.proc.userdata["prompts"]
+    prompts_rate = ctx.proc.userdata.get("prompts_rate")
+    session.prompts = {
+        key: session._fit(audio, prompts_rate)
+        for key, audio in ctx.proc.userdata["prompts"].items()
+    }
     stt_model = ctx.proc.userdata["stt"]
 
     @ctx.room.on("track_subscribed")

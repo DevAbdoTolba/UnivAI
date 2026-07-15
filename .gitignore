@@ -18,6 +18,13 @@ uploads/
 # lecture content is generated from the uploaded book (services/lecture_gen.py)
 # and committed so the team can see the current course in git (see lectures/)
 
+# the lecturer's pre-rendered voice (services/prerender_audio.py) — binary,
+# regenerable from script.json in minutes
+lectures/*/audio/
+lectures/_prompts/
+prerender.log
+prerender.err
+
 # service logs
 worker-out.log
 worker-err.log

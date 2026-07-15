@@ -23,6 +23,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Model output lands in log prints; on Windows a redirected stdout defaults to
+# cp1252 and one "≤" in a reply kills the whole course build.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common.db import execute, fetch_one  # noqa: E402
@@ -32,7 +37,11 @@ ROOT = Path(__file__).resolve().parents[1]
 LECTURES_DIR = ROOT / "lectures"
 WEEKS = 4
 SLIDES_PER_WEEK = 3
-QUESTIONS_PER_WEEK = 8
+# The quiz bank per week: >=90% of any served paper must be answerable from
+# what the lecturer SAID (easy if you attended); self-study questions from the
+# wider pages exist but can never exceed 10% of a paper.
+LECTURE_QUESTIONS = 8
+SELF_STUDY_QUESTIONS = 2
 # A 3B model with an 8k window: keep the source well under it.
 MAX_SOURCE_CHARS = 12000
 MAX_CHARS_PER_PAGE = 1500
@@ -220,44 +229,54 @@ def generate_week(week: int, pages: list[tuple[int, str]]) -> dict:
     return data
 
 
-def check_quiz(data: dict) -> str | None:
-    questions = data.get("questions")
-    if not isinstance(questions, list) or len(questions) < 5:
-        return "need at least 5 questions"
-    for question in questions:
-        if not isinstance(question.get("prompt"), str) or not question["prompt"].strip():
-            return "a question is missing its prompt"
-        options = question.get("options")
-        if not isinstance(options, list) or len(options) != 4:
-            return "each question needs exactly 4 options"
-        if not all(isinstance(o, str) and o.strip() for o in options):
-            return "empty option"
-        if question.get("correct") not in ("A", "B", "C", "D"):
-            return 'correct must be "A", "B", "C" or "D"'
-    return None
+def check_quiz(minimum: int):
+    def check(data: dict) -> str | None:
+        questions = data.get("questions")
+        if not isinstance(questions, list) or len(questions) < minimum:
+            return f"need at least {minimum} questions"
+        for question in questions:
+            if not isinstance(question.get("prompt"), str) or not question["prompt"].strip():
+                return "a question is missing its prompt"
+            options = question.get("options")
+            if not isinstance(options, list) or len(options) != 4:
+                return "each question needs exactly 4 options"
+            if not all(isinstance(o, str) and o.strip() for o in options):
+                return "empty option"
+            if question.get("correct") not in ("A", "B", "C", "D"):
+                return 'correct must be "A", "B", "C" or "D"'
+        return None
+
+    return check
 
 
-def generate_quiz(week: int, title: str, pages: list[tuple[int, str]]) -> list[dict]:
-    prompt = (
-        f'Write {QUESTIONS_PER_WEEK} multiple-choice questions for the quiz on "{title}" '
-        "using ONLY these textbook pages.\n\n"
-        "Return exactly this JSON shape:\n"
-        "{\n"
-        '  "questions": [\n'
-        '    {"prompt": "the question?", "options": ["first", "second", "third", "fourth"], "correct": "A"}\n'
-        "  ]\n"
-        "}\n\n"
-        'Rules: 4 options each, exactly one correct, "correct" is the letter of the correct '
-        "option (A = first, B = second, C = third, D = fourth). Options must NOT start with "
-        "letter labels. Spread the correct letters around - not all the same. "
-        "No trick questions about page numbers or formatting.\n\n"
-        "Textbook pages:\n" + source_block(pages)
-    )
-    data = ask_json(prompt, QUIZ_SYSTEM, 1800, check_quiz)
+QUESTION_SHAPE = (
+    "Return exactly this JSON shape:\n"
+    "{\n"
+    '  "questions": [\n'
+    '    {"prompt": "the question?", "options": ["first", "second", "third", "fourth"], "correct": "A"}\n'
+    "  ]\n"
+    "}\n\n"
+    'Rules: 4 options each, exactly one correct, "correct" is the letter of the correct '
+    "option (A = first, B = second, C = third, D = fourth). Options must NOT start with "
+    "letter labels. Spread the correct letters around - not all the same. "
+    "No trick questions about page numbers or formatting.\n\n"
+)
 
-    # The exam system's shape: options carry the letter label, correct_option is the letter.
+
+def lecture_text(title: str, segments: list[dict]) -> str:
+    """Everything the lecturer actually says, as the quiz's source of truth."""
+    return f"Lecture: {title}\n\n" + "\n\n".join(seg["text"] for seg in segments)
+
+
+def ask_questions(prompt: str, count: int, source: str) -> list[dict]:
+    # Accept a slightly short reply rather than failing a whole course build —
+    # but never demand MORE than was asked for (the self-study call asks for 2).
+    data = ask_json(prompt, QUIZ_SYSTEM, 1800, check_quiz(max(1, count - 2)))
+
+    # The exam system's shape: options carry the letter label, correct_option is
+    # the letter. `source` says whether the lecturer taught it or it is homework.
     questions = []
-    for question in data["questions"][:QUESTIONS_PER_WEEK]:
+    for question in data["questions"][:count]:
         options = [
             f"{letter}) {re.sub(r'^[A-Da-d][).: ]+\\s*', '', option.strip())}"
             for letter, option in zip("ABCD", question["options"])
@@ -268,9 +287,37 @@ def generate_quiz(week: int, title: str, pages: list[tuple[int, str]]) -> list[d
                 "type": "mcq",
                 "options": options,
                 "correct_option": question["correct"],
+                "source": source,
             }
         )
     return questions
+
+
+def generate_quiz(
+    title: str, segments: list[dict], pages: list[tuple[int, str]]
+) -> list[dict]:
+    # 1) The bulk of the bank: questions a student who WATCHED the lecture finds
+    #    easy — every answer must have been said out loud by the lecturer.
+    taught = ask_questions(
+        f'Write {LECTURE_QUESTIONS} multiple-choice questions testing ONLY what this lecturer '
+        "actually said. Every correct answer must be stated explicitly in the lecture below - "
+        "a student who watched it should find these easy. Do not ask about anything the "
+        "lecture does not mention.\n\n" + QUESTION_SHAPE +
+        "The lecture:\n" + lecture_text(title, segments),
+        LECTURE_QUESTIONS,
+        "lecture",
+    )
+
+    # 2) The small self-study tail: from the week's wider pages, beyond the slides.
+    homework = ask_questions(
+        f'Write {SELF_STUDY_QUESTIONS} multiple-choice SELF-STUDY questions for the week on '
+        f'"{title}", using ONLY these textbook pages. Pick details a short lecture would not '
+        "have covered - the student is expected to have read the pages themselves.\n\n"
+        + QUESTION_SHAPE + "Textbook pages:\n" + source_block(pages),
+        SELF_STUDY_QUESTIONS,
+        "self_study",
+    )
+    return taught + homework
 
 
 # ---------------------------------------------------------------- writing files
@@ -334,15 +381,50 @@ def build_slides() -> None:
         raise RuntimeError(f"slidev build failed: {result.stderr[-800:]}")
 
 
+def prerender_voice() -> None:
+    """Record the whole lecture to disk (services/prerender_audio.py) in a
+    subprocess, so the TTS model's memory is returned the moment it is done."""
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "services" / "prerender_audio.py")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30 * 60,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"voice pre-render failed: {(result.stdout + result.stderr)[-500:]}")
+
+
 # ---------------------------------------------------------------- main
+
+
+def regenerate_quizzes(book_id: int, weeks: list[list[tuple[int, str]]]) -> None:
+    """Rewrite only quiz.json per week, from the ALREADY generated lecture scripts."""
+    for week, week_pages in enumerate(weeks, start=1):
+        script = json.loads(
+            (LECTURES_DIR / f"week-{week}" / "script.json").read_text("utf-8")
+        )
+        progress(book_id, f"Rewriting quiz {week} of {WEEKS} — “{script['title']}”…")
+        quiz = generate_quiz(script["title"], script["segments"], week_pages)
+        (LECTURES_DIR / f"week-{week}" / "quiz.json").write_text(
+            json.dumps(
+                {"week": week, "title": script["title"], "questions": quiz},
+                indent=2,
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
 
 def main() -> int:
     if len(sys.argv) < 3:
-        print(json.dumps({"ok": False, "error": "usage: lecture_gen.py <pdf_path> <book_id>"}))
+        print(json.dumps({"ok": False, "error": "usage: lecture_gen.py <pdf_path> <book_id> [--quizzes-only]"}))
         return 2
     pdf_path = Path(sys.argv[1]).resolve()
     book_id = int(sys.argv[2])
+    quizzes_only = "--quizzes-only" in sys.argv[3:]
 
     if not fetch_one("SELECT id FROM books WHERE id = %s", (book_id,)):
         print(json.dumps({"ok": False, "error": f"no book with id {book_id}"}))
@@ -354,12 +436,24 @@ def main() -> int:
         execute("UPDATE books SET pages = %s WHERE id = %s", (len(pages), book_id))
         weeks = split_weeks(pages)
 
+        if quizzes_only:
+            regenerate_quizzes(book_id, weeks)
+            execute(
+                "UPDATE books SET status = 'ready', progress = %s WHERE id = %s",
+                (f"Quizzes rewritten — {WEEKS} weeks.", book_id),
+            )
+            print(json.dumps({"ok": True, "weeks": WEEKS, "quizzes_only": True}))
+            return 0
+
         for week, week_pages in enumerate(weeks, start=1):
             first, last = week_pages[0][0], week_pages[-1][0]
             progress(book_id, f"Writing lecture {week} of {WEEKS} (pages {first}-{last})…")
             lecture = generate_week(week, week_pages)
             progress(book_id, f"Writing quiz {week} of {WEEKS} — “{lecture['title']}”…")
-            quiz = generate_quiz(week, lecture["title"], week_pages)
+            spoken = [{"text": lecture["intro"]}] + [
+                {"text": slide["narration"]} for slide in lecture["slides"]
+            ]
+            quiz = generate_quiz(lecture["title"], spoken, week_pages)
             write_week(week, lecture, quiz)
             execute(
                 "UPDATE lectures SET title = %s WHERE week = %s",
@@ -368,6 +462,9 @@ def main() -> int:
 
         progress(book_id, "Building the slide decks…")
         build_slides()
+
+        progress(book_id, "Recording the lecturer's voice…")
+        prerender_voice()
 
         execute(
             "UPDATE books SET status = 'ready', progress = %s WHERE id = %s",

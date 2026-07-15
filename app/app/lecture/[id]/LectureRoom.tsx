@@ -23,6 +23,10 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
+import Step from "@mui/material/Step";
+import StepContent from "@mui/material/StepContent";
+import StepLabel from "@mui/material/StepLabel";
+import Stepper from "@mui/material/Stepper";
 import Typography from "@mui/material/Typography";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
@@ -154,7 +158,15 @@ export default function LectureRoom({ lectureId }: Props) {
             if (message.type === "answer") setLastAnswer(message.payload);
             if (message.type === "transcript") setTranscript(message.text ?? null);
             if (message.type === "progress") {
-              setSteps((previous) => [...previous, { stage: message.stage, detail: message.detail }]);
+              setSteps((previous) => {
+                const last = previous[previous.length - 1];
+                // The worker can resend a stage (retries, reconnects); showing
+                // the same line twice reads as a glitch, not as progress.
+                if (last && last.stage === message.stage && last.detail === message.detail) {
+                  return previous;
+                }
+                return [...previous, { stage: message.stage, detail: message.detail }];
+              });
             }
             if (message.type === "hand") {
               if (message.state === "acked") setHand("acked");
@@ -344,34 +356,86 @@ export default function LectureRoom({ lectureId }: Props) {
         </CardContent>
       </Card>
 
-      {agentState === "answering" && (
+      {(hand !== "idle" ||
+        transcript !== null ||
+        agentState === "listening" ||
+        agentState === "review" ||
+        agentState === "asking" ||
+        agentState === "answering") && (
         <Card variant="outlined">
           <CardContent>
             <Stack spacing={1}>
               <Typography variant="overline" color="text.secondary">
-                Working on your answer
+                Your question
               </Typography>
-              <LinearProgress />
-              <List dense>
-                {steps.map((step, index) => (
-                  <ListItem key={index}>
-                    <ListItemText
-                      primary={STEP_LABEL[step.stage] ?? step.stage}
-                      secondary={step.detail || null}
-                    />
-                    {index === steps.length - 1 && step.stage !== "problem" ? (
-                      <CircularProgress size={16} />
-                    ) : (
-                      <Chip
-                        size="small"
-                        color={step.stage === "problem" ? "warning" : "success"}
-                        variant="outlined"
-                        label={step.stage === "problem" ? "issue" : "done"}
-                      />
-                    )}
-                  </ListItem>
-                ))}
-              </List>
+              <Stepper
+                orientation="vertical"
+                activeStep={
+                  agentState === "answering"
+                    ? 4
+                    : agentState === "review" || transcript !== null
+                      ? 3
+                      : hand === "acked" || agentState === "listening"
+                        ? 2
+                        : 1
+                }
+              >
+                <Step>
+                  <StepLabel>Hand raised</StepLabel>
+                </Step>
+                <Step>
+                  <StepLabel>Lecturer calls on you</StepLabel>
+                  <StepContent>
+                    <Typography variant="body2" color="text.secondary">
+                      The lecturer finishes the sentence, then asks you by name.
+                    </Typography>
+                  </StepContent>
+                </Step>
+                <Step>
+                  <StepLabel>Ask your question</StepLabel>
+                  <StepContent>
+                    <Typography variant="body2" color="text.secondary">
+                      Your microphone is unlocked — unmute and speak.
+                    </Typography>
+                  </StepContent>
+                </Step>
+                <Step>
+                  <StepLabel>Confirm what I heard</StepLabel>
+                  <StepContent>
+                    <Typography variant="body2" color="text.secondary">
+                      Check the transcript below — edit it or send it as is.
+                    </Typography>
+                  </StepContent>
+                </Step>
+                <Step>
+                  <StepLabel>Answering</StepLabel>
+                  <StepContent>
+                    <Stack spacing={1}>
+                      <LinearProgress />
+                      <List dense>
+                        {steps.map((step, index) => (
+                          <ListItem key={index}>
+                            <ListItemText
+                              primary={STEP_LABEL[step.stage] ?? step.stage}
+                              secondary={step.detail || null}
+                            />
+                            {index === steps.length - 1 && step.stage !== "problem" ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <Chip
+                                size="small"
+                                color={step.stage === "problem" ? "warning" : "success"}
+                                variant="outlined"
+                                label={step.stage === "problem" ? "issue" : "done"}
+                              />
+                            )}
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Stack>
+                  </StepContent>
+                </Step>
+              </Stepper>
             </Stack>
           </CardContent>
         </Card>

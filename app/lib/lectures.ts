@@ -99,6 +99,11 @@ export async function getLectures(): Promise<Lecture[]> {
     let state: Lecture["state"] = "upcoming";
     if (virtualNow >= endsAt) state = "done";
     else if (virtualNow >= startsAt) state = "live";
+    // Time travel makes contradictions possible: sit through a lecture, then
+    // reset the clock to before it "starts", and it would show LIVE or
+    // upcoming while refusing to open ("already finished"). A lecture you
+    // completed is done, whatever the clock claims.
+    if (completed) state = "done";
 
     let blockedReason: BlockedReason = null;
     if (completed) {
