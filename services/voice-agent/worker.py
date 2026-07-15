@@ -370,9 +370,21 @@ class LectureSession:
             }
         )
 
-        # The answer itself is not interruptible: it is short by design.
-        for sentence in split_sentences(result["answer"]):
-            await self.speak(sentence, interruptible=False)
+        # The answer itself is not interruptible: it is short by design. Render
+        # the NEXT sentence while the current one plays — the silent render gap
+        # between sentences was why "Speaking" felt like it never finished.
+        sentences = split_sentences(result["answer"])
+        upcoming: asyncio.Task[np.ndarray] | None = (
+            asyncio.create_task(self.render(sentences[0])) if sentences else None
+        )
+        for index in range(len(sentences)):
+            audio = await upcoming if upcoming else await self.render(sentences[index])
+            upcoming = (
+                asyncio.create_task(self.render(sentences[index + 1]))
+                if index + 1 < len(sentences)
+                else None
+            )
+            await self.play(audio, interruptible=False)
         return True
 
 
