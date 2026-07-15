@@ -317,9 +317,20 @@ export default function AdminPage() {
             </Grid>
 
             {building ? (
-              <Alert severity="info">
-                Building… follow the progress on the Upload page.
-              </Alert>
+              <Stack spacing={1}>
+                <LinearProgress />
+                <Typography variant="body2">
+                  {String(
+                    state?.books.find(
+                      (book) => book.status === "generating" || book.status === "ingesting"
+                    )?.progress ?? "Starting…"
+                  )}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Live from the build — this line updates every few seconds. Big sizes on
+                  the local models take a while; the voice re-render comes last.
+                </Typography>
+              </Stack>
             ) : (
               <Typography variant="caption" color="text.secondary">
                 One button on purpose: lectures, slides, quizzes and the pre-recorded
@@ -327,6 +338,12 @@ export default function AdminPage() {
                 lectures the students actually get.
               </Typography>
             )}
+            {state?.books.some((book) => book.status === "failed") && !building ? (
+              <Alert severity="error">
+                Last build failed:{" "}
+                {String(state.books.find((book) => book.status === "failed")?.error ?? "unknown")}
+              </Alert>
+            ) : null}
           </Stack>
         </CardContent>
       </Card>
