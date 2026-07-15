@@ -15,7 +15,7 @@ PIP      := .venv/Scripts/pip.exe           # Linux/macOS: .venv/bin/pip
 DB       := docker exec -i univai-db psql -U univai -d univai
 APP_PORT ?= 3000
 
-.PHONY: help setup env up down schema reset rag app worker slides dev status clean
+.PHONY: help setup env up down schema reset rag app worker exams slides dev status clean
 
 help: ## Show this help
 	@echo ""
@@ -73,6 +73,9 @@ app: ## Run the Next.js app — :$(APP_PORT)
 
 worker: ## Run the live-lecture voice agent (TTS + STT). Needs LIVEKIT_* keys
 	$(PY) services/voice-agent/worker.py dev
+
+exams: ## Run the exam system (UnivAI-exam_system) - :3200
+	cd UnivAI-exam_system && npm run dev
 
 slides: ## Build the Slidev decks to app/public/slides/
 	node scripts/build-slides.mjs

@@ -100,7 +100,12 @@ class LectureSession:
         self.source = rtc.AudioSource(self.sample_rate, 1)
         self.track = rtc.LocalAudioTrack.create_audio_track("lecturer", self.source)
 
-        self.interrupted = asyncio.Event()   # set by the Listener on a barge-in
+        self.interrupted = asyncio.Event()   # legacy stop signal (room closing)
+        # The raise-hand protocol: the student asks permission BEFORE unmuting.
+        self.hand_raised = asyncio.Event()
+        self.mic_unmuted = asyncio.Event()
+        self.hand_active = False             # capture window: only now does the Listener record
+        self.prompts: dict[str, np.ndarray] = {}
         # What Whisper heard. It is shown in the browser for the student to correct.
         self.heard: asyncio.Queue[str] = asyncio.Queue()
         # What the student actually confirmed (possibly edited). "" means they cancelled.
@@ -197,35 +202,73 @@ class LectureSession:
             if index + 1 < len(script):
                 upcoming = asyncio.create_task(self.render(script[index + 1][3]))
 
-            if await self.play(audio):
-                index += 1
-                continue
-
+            finished = await self.play(audio)
             if self.closed:
                 break
+            if finished:
+                index += 1
 
-            # INTERRUPTED. The prefetched sentence is still the right one to say
-            # next, but we repeat THIS sentence from its start, so drop it.
-            if upcoming:
-                upcoming.cancel()
-                upcoming = None
-
-            await self.handle_interruption()
-            await self.send({"type": "state", "state": "lecturing"})
-            current_slide = -1          # re-announce the slide after the detour
+            # The student raised a hand: the sentence above was allowed to finish
+            # (that is the whole point), and only now does the lecturer respond.
+            if self.hand_raised.is_set():
+                if upcoming:
+                    upcoming.cancel()
+                    upcoming = None
+                await self.handle_hand()
+                await self.send({"type": "state", "state": "lecturing"})
+                current_slide = -1      # re-announce the slide after the detour
 
         position.segment = len(segments)
         await self.send({"type": "state", "state": "ended"})
 
-    async def handle_interruption(self) -> None:
+    async def _wait_for_unmute(self, seconds: float) -> bool:
+        try:
+            await asyncio.wait_for(self.mic_unmuted.wait(), timeout=seconds)
+            return True
+        except asyncio.TimeoutError:
+            return False
+
+    async def handle_hand(self) -> None:
+        """The raise-hand protocol, exactly as specified:
+
+        hand up -> finish the sentence -> ask by name -> wait 4 s for an unmute
+        -> friendly reminder -> wait again -> either take the question, or lower
+        the hand and pull the class back with the resume line.
+        """
+        self.hand_raised.clear()
+
+        await self.send({"type": "state", "state": "asking"})
+        await self.play(self.prompts["ask"], interruptible=False)
+        await self.send({"type": "hand", "state": "acked"})
+
+        unmuted = await self._wait_for_unmute(4.0)
+        if not unmuted:
+            await self.play(self.prompts["remind"], interruptible=False)
+            unmuted = await self._wait_for_unmute(8.0)
+
+        answered = False
+        if unmuted:
+            self.hand_active = True
+            try:
+                answered = await self.collect_and_answer()
+            finally:
+                self.hand_active = False
+
+        await self.send({"type": "hand", "state": "lowered"})
+        if not answered:
+            # No question came. Lower the hand and catch the room's attention.
+            await self.play(self.prompts["resume"], interruptible=False)
+
+    async def collect_and_answer(self) -> bool:
+        """Capture the question, let the student edit the transcript, answer it.
+        Returns False when nothing was ultimately asked."""
         await self.send({"type": "state", "state": "listening"})
 
         try:
             heard = await asyncio.wait_for(self.heard.get(), timeout=20)
         except asyncio.TimeoutError:
-            # They made a noise but never actually asked anything. Carry on.
-            self.interrupted.clear()
-            return
+            # They unmuted but never actually asked anything. Carry on.
+            return False
 
         # Nothing is asked on the student's behalf. We show them what we heard and
         # they send it, edit it first, or throw it away.
@@ -238,13 +281,11 @@ class LectureSession:
         except asyncio.TimeoutError:
             print("[lecture] no confirmation - resuming the lecture")
             await self.send({"type": "transcript", "text": None})
-            self.interrupted.clear()
-            return
+            return False
 
         if not question.strip():          # they cancelled
             print("[lecture] question cancelled")
-            self.interrupted.clear()
-            return
+            return False
 
         await self.send({"type": "state", "state": "answering"})
         print(f"[lecture] question: {question}")
@@ -263,11 +304,9 @@ class LectureSession:
         )
 
         # The answer itself is not interruptible: it is short by design.
-        self.interrupted.clear()
         for sentence in split_sentences(result["answer"]):
             await self.speak(sentence, interruptible=False)
-
-        self.interrupted.clear()
+        return True
 
 
 async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) -> None:
@@ -277,19 +316,32 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) ->
     event loop stalls the Lecturer's audio pump, which sounds exactly like the
     lecture dying twenty seconds in — because it does.
     """
+    from collections import deque
+
     stream = rtc.AudioStream(track, sample_rate=16000, num_channels=1)
     buffer: list[np.ndarray] = []
-    speech_ms = 0
-    silence_ms = 0
+    # Pre-roll: the VAD only fires AFTER you have been talking for a moment, so
+    # without this ring the first syllables were cut off — Whisper then heard a
+    # clipped fragment and often returned nothing. That was the biggest reason
+    # "the mic recording does not catch".
+    preroll: deque[np.ndarray] = deque(maxlen=50)  # ~0.5 s at 10 ms frames
+    speech_ms = 0.0
+    silence_ms = 0.0
     capturing = False
+    # Adaptive threshold: a fixed 0.02 RMS misses quiet microphones entirely.
+    # Track the noise floor and trigger a few times above it instead.
+    noise_floor = 0.004
 
     async for event in stream:
         frame = event.frame
         samples = np.frombuffer(frame.data, dtype=np.int16).astype(np.float32) / 32768.0
         frame_ms = len(samples) / 16000 * 1000
 
-        # Energy-based VAD. Cheap, and enough to decide "is the student talking".
-        loud = float(np.sqrt(np.mean(samples**2))) > 0.02
+        rms = float(np.sqrt(np.mean(samples**2)))
+        threshold = min(0.02, max(0.006, noise_floor * 3.5))
+        loud = rms > threshold
+        if not loud:
+            noise_floor = 0.95 * noise_floor + 0.05 * rms
 
         if loud:
             speech_ms += frame_ms
@@ -297,12 +349,20 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) ->
         else:
             silence_ms += frame_ms
 
-        # A muted mic publishes no audio at all, so we simply never get here —
-        # that is exactly why the mute button protects the lecture.
+        # Only the raise-hand window records anything: outside it the student is
+        # muted anyway, and stray noise must never derail the lecture.
+        if not session.hand_active:
+            preroll.append(samples)
+            buffer, capturing, speech_ms = [], False, 0
+            continue
+
+        if not capturing:
+            preroll.append(samples)
+
         if not capturing and speech_ms >= SPEECH_TRIGGER_MS:
             capturing = True
-            session.interrupted.set()   # cuts the Lecturer off mid-sentence
-            print("[listener] barge-in")
+            buffer = list(preroll)      # include the syllables from BEFORE the trigger
+            print(f"[listener] capturing (threshold {threshold:.3f})")
 
         if capturing:
             buffer.append(samples)
@@ -310,17 +370,15 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) ->
             if silence_ms >= SILENCE_END_MS:
                 audio = np.concatenate(buffer) if buffer else np.zeros(1, dtype=np.float32)
                 buffer, capturing, speech_ms, silence_ms = [], False, 0, 0
+                preroll.clear()
 
                 def run_stt(samples: np.ndarray) -> str:
                     segments, _info = model.transcribe(samples, language="en")
                     return " ".join(seg.text.strip() for seg in segments).strip()
 
                 text = await asyncio.to_thread(run_stt, audio)
-
                 if text:
                     await session.heard.put(text)
-                else:
-                    session.interrupted.clear()
 
         if not capturing and silence_ms > 1000:
             speech_ms = 0
@@ -328,7 +386,21 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) ->
 
 def prewarm(proc: agents.JobProcess) -> None:
     """Load the models once, when the worker starts — not when a student joins."""
-    proc.userdata["tts"] = load_engine()
+    engine = load_engine()
+    proc.userdata["tts"] = engine
+
+    # The raise-hand prompts, personalized and rendered ONCE with the same voice
+    # as the lecture, so the lecturer never changes voice mid-room.
+    student = os.getenv("STUDENT_NAME", "there")
+    prompt_texts = {
+        "ask": f"Yes, {student}? Do you have a question? Unmute your microphone and go ahead.",
+        "remind": f"{student}, your hand is still raised. Unmute whenever you are ready, I am listening.",
+        "resume": "No question? No problem. Alright everyone, eyes back on the slides, and let us continue!",
+    }
+    proc.userdata["prompts"] = {
+        key: engine.render(text) for key, text in prompt_texts.items()
+    }
+    print(f"[lecture] raise-hand prompts rendered for '{student}'")
 
     from faster_whisper import WhisperModel
 
@@ -352,6 +424,7 @@ async def entrypoint(ctx: agents.JobContext) -> None:
     print(f"[lecture] week {week}: {lecture.title} ({len(lecture.segments)} segments)")
 
     session = LectureSession(ctx.room, lecture, ctx.proc.userdata["tts"])
+    session.prompts = ctx.proc.userdata["prompts"]
     stt_model = ctx.proc.userdata["stt"]
 
     @ctx.room.on("track_subscribed")
@@ -370,11 +443,25 @@ async def entrypoint(ctx: agents.JobContext) -> None:
             session.confirmed.put_nowait(str(message.get("text", "")))
         elif message.get("type") == "cancel":
             session.confirmed.put_nowait("")
+        elif message.get("type") == "raise_hand":
+            print("[lecture] hand raised")
+            session.hand_raised.set()
+        elif message.get("type") == "mic":
+            if message.get("muted"):
+                session.mic_unmuted.clear()
+            else:
+                session.mic_unmuted.set()
 
     await session.run()
 
 
 if __name__ == "__main__":
     agents.cli.run_app(
-        agents.WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm)
+        agents.WorkerOptions(
+            entrypoint_fnc=entrypoint,
+            prewarm_fnc=prewarm,
+            # Prewarm loads Kokoro + Whisper and renders the raise-hand prompts;
+            # the SDK's default 10 s initialize timeout kills the process mid-load.
+            initialize_process_timeout=180.0,
+        )
     )

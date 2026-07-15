@@ -23,6 +23,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
+import PanToolAltIcon from "@mui/icons-material/PanToolAlt";
 import MicMeter from "./MicMeter";
 import TranscriptReview from "./TranscriptReview";
 import { formatLateness } from "@/lib/time";
@@ -41,6 +42,7 @@ import { formatLateness } from "@/lib/time";
 type AgentState =
   | "connecting"
   | "lecturing"
+  | "asking"
   | "listening"
   | "review"
   | "answering"
@@ -49,6 +51,7 @@ type AgentState =
 const STATE_LABEL: Record<AgentState, string> = {
   connecting: "Connecting…",
   lecturing: "Lecturer speaking",
+  asking: "Lecturer is asking you…",
   listening: "Listening to you…",
   review: "Paused — check your question",
   answering: "Answering your question",
@@ -58,6 +61,7 @@ const STATE_LABEL: Record<AgentState, string> = {
 const STATE_COLOR: Record<AgentState, "default" | "primary" | "secondary" | "success"> = {
   connecting: "default",
   lecturing: "primary",
+  asking: "secondary",
   listening: "secondary",
   review: "secondary",
   answering: "secondary",
@@ -81,6 +85,9 @@ export default function LectureRoom({ lectureId }: Props) {
   const [lastAnswer, setLastAnswer] = useState<{ question: string; answer: string; pages: number[] } | null>(null);
   // What Whisper heard, waiting for the student to confirm or correct it.
   const [transcript, setTranscript] = useState<string | null>(null);
+  // The raise-hand protocol: nobody unmutes unannounced. Raise your hand, the
+  // lecturer finishes the sentence and asks you by name, THEN the mic unlocks.
+  const [hand, setHand] = useState<"idle" | "raised" | "acked">("idle");
   // Chrome refuses to play audio on a page the user has not interacted with. The
   // lecture page auto-joins, so there is no gesture and the lecturer is silently
   // muted. LiveKit reports this, and room.startAudio() fixes it — but only from
@@ -127,6 +134,20 @@ export default function LectureRoom({ lectureId }: Props) {
             }
             if (message.type === "answer") setLastAnswer(message.payload);
             if (message.type === "transcript") setTranscript(message.text ?? null);
+            if (message.type === "hand") {
+              if (message.state === "acked") setHand("acked");
+              if (message.state === "lowered") {
+                setHand("idle");
+                // Hand time is over: whatever happened, the room goes quiet again.
+                const track = micRef.current;
+                if (track && !track.isMuted) {
+                  track.mute().then(() => {
+                    setMuted(true);
+                    reply({ type: "mic", muted: true });
+                  });
+                }
+              }
+            }
           } catch {
             // A malformed data message must never take the lecture down.
           }
@@ -135,7 +156,11 @@ export default function LectureRoom({ lectureId }: Props) {
 
       await room.connect(data.url, data.token);
 
-      const track = await createLocalAudioTrack();
+      const track = await createLocalAudioTrack({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      });
       micRef.current = track;
       setMic(track);
       await track.mute();            // published, but silent until the student unmutes
@@ -175,20 +200,28 @@ export default function LectureRoom({ lectureId }: Props) {
       new TextEncoder().encode(JSON.stringify(message)),
       { reliable: true }
     );
-    setTranscript(null);
+    if (message.type === "question" || message.type === "cancel") setTranscript(null);
+  }
+
+  async function raiseHand() {
+    setHand("raised");
+    await room.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ type: "raise_hand" })),
+      { reliable: true }
+    );
   }
 
   async function toggleMute() {
     const track = micRef.current;
     if (!track) return;
-    // Muted means the Listener agent cannot hear us, so the lecture is never
-    // interrupted — that is the whole point of the button.
     if (muted) {
       await track.unmute();
       setMuted(false);
+      reply({ type: "mic", muted: false });
     } else {
       await track.mute();
       setMuted(true);
+      reply({ type: "mic", muted: true });
     }
   }
 
@@ -291,10 +324,25 @@ export default function LectureRoom({ lectureId }: Props) {
               <Grid>
                 <Button
                   variant="contained"
+                  color="secondary"
+                  startIcon={<PanToolAltIcon />}
+                  onClick={raiseHand}
+                  disabled={!connected || hand !== "idle"}
+                >
+                  {hand === "raised"
+                    ? "Hand raised…"
+                    : hand === "acked"
+                      ? "Lecturer is waiting"
+                      : "Raise hand"}
+                </Button>
+              </Grid>
+              <Grid>
+                <Button
+                  variant="contained"
                   color={muted ? "error" : "primary"}
                   startIcon={muted ? <MicOffIcon /> : <MicIcon />}
                   onClick={toggleMute}
-                  disabled={!connected}
+                  disabled={!connected || (muted && hand !== "acked")}
                 >
                   {muted ? "Unmute microphone" : "Mute microphone"}
                 </Button>
@@ -311,9 +359,13 @@ export default function LectureRoom({ lectureId }: Props) {
               </Grid>
             </Grid>
             <Typography variant="body2" color="text.secondary">
-              {muted
-                ? "Your microphone is off. Unmute it to ask a question."
-                : "Just speak — the lecturer will stop, answer from the book, and carry on."}
+              {hand === "acked"
+                ? "The lecturer asked for you — unmute and ask your question."
+                : hand === "raised"
+                  ? "Hand raised. The lecturer will finish the sentence and ask you."
+                  : muted
+                    ? "Raise your hand to ask a question — the unmute button unlocks when the lecturer calls on you."
+                    : "Ask your question — when you stop talking you can review what we heard."}
             </Typography>
           </Stack>
         </CardContent>

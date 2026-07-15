@@ -47,6 +47,7 @@ function Target-Help {
         @("rag",    "Run the team's RAG MCP server  (:8000)"),
         @("app",    "Run the Next.js app            (:$AppPort)"),
         @("worker", "Run the live-lecture voice agent (needs LIVEKIT_* keys)"),
+        @("exams",  "Run the exam system (:3200)"),
         @("slides", "Build the Slidev decks to app/public/slides/"),
         @("dev",    "Start infra, then RAG + app + worker in separate windows"),
         @("status", "Show what is running"),
@@ -106,6 +107,7 @@ function Target-Rag    { Push-Location UnivAI-Agent; uv run python mcp_server.py
 function Target-App    { Push-Location app; npx next dev -p $AppPort; Pop-Location }
 function Target-Worker { & $Py services/voice-agent/worker.py dev }
 function Target-Slides { node scripts/build-slides.mjs }
+function Target-Exams  { Push-Location UnivAI-exam_system; npm run dev; Pop-Location }
 
 function Target-Dev {
     Target-Up
@@ -114,6 +116,7 @@ function Target-Dev {
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 rag"
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort"
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 worker"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams"
 
     Write-Host ""
     Write-Host "  app    http://localhost:$AppPort"           -ForegroundColor Green
@@ -147,6 +150,7 @@ switch ($Target.ToLower()) {
     "rag"    { Target-Rag }
     "app"    { Target-App }
     "worker" { Target-Worker }
+    "exams"  { Target-Exams }
     "slides" { Target-Slides }
     "dev"    { Target-Dev }
     "status" { Target-Status }
