@@ -48,6 +48,8 @@ type AdminState = {
     score: string;
     max_score: string;
     feedback: string | null;
+    flagged?: boolean;
+    report?: { suspicion_score?: number; events?: unknown[] } | null;
   }>;
   qaLog: Array<{
     id: number;
@@ -301,6 +303,7 @@ export default function AdminPage() {
                     <TableCell>Week</TableCell>
                     <TableCell align="right">Score</TableCell>
                     <TableCell>Feedback</TableCell>
+                    <TableCell>Integrity</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -310,6 +313,17 @@ export default function AdminPage() {
                       <TableCell>{grade.week ?? "—"}</TableCell>
                       <TableCell align="right">{`${grade.score} / ${grade.max_score}`}</TableCell>
                       <TableCell>{grade.feedback ?? "—"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          color={grade.flagged ? "error" : "success"}
+                          label={
+                            grade.flagged
+                              ? `FLAGGED — suspicion ${grade.report?.suspicion_score ?? "?"}, ${grade.report?.events?.length ?? 0} events`
+                              : `clean — ${grade.report?.events?.length ?? 0} events`
+                          }
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

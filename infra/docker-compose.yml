@@ -30,6 +30,17 @@ services:
     volumes:
       - univai-qdrant:/qdrant/storage
 
+  # Exam storage for the UnivAI-exam_system submodule (local for now).
+  mongo:
+    image: mongo:7
+    container_name: univai-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - univai-mongo:/data/db
+
 volumes:
   univai-pgdata:
   univai-qdrant:
+  univai-mongo:

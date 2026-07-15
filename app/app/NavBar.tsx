@@ -11,6 +11,7 @@ import Link from "next/link";
 const LINKS = [
   { href: "/upload", label: "Books" },
   { href: "/schedule", label: "Schedule" },
+  { href: "/exams", label: "Exams" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/admin", label: "Admin" },
 ];

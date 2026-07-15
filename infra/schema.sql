@@ -70,3 +70,9 @@ CREATE TABLE IF NOT EXISTS qa_log (
 -- The student finished watching this lecture (the Lecturer agent reached the end).
 -- A finished lecture cannot be re-opened.
 ALTER TABLE attendance ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+
+-- Exam results arriving from the exam system's webhook carry a proctoring
+-- report; we keep it so the admin can judge whether an attempt has a problem.
+ALTER TABLE grades ADD COLUMN IF NOT EXISTS exam_id TEXT UNIQUE;
+ALTER TABLE grades ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE grades ADD COLUMN IF NOT EXISTS report JSONB;

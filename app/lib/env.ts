@@ -22,6 +22,11 @@ export const env = {
   // The team's RAG service (UnivAI-Agent). This app only consumes it.
   RAG_MCP_URL: read("RAG_MCP_URL"),
 
+  // The team's exam system (UnivAI-exam_system, port 3200) and its MongoDB.
+  MONGODB_URI: read("MONGODB_URI", "mongodb://localhost:27017/univai_exams"),
+  EXAM_SYSTEM_URL: read("EXAM_SYSTEM_URL", "http://localhost:3200"),
+  STUDENT_NAME: read("STUDENT_NAME", "Student"),
+
   LIVEKIT_URL: read("LIVEKIT_URL") || read("NEXT_PUBLIC_LIVEKIT_URL"),
   LIVEKIT_API_KEY: read("LIVEKIT_API_KEY"),
   LIVEKIT_API_SECRET: read("LIVEKIT_API_SECRET"),
