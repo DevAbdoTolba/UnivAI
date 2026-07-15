@@ -192,16 +192,19 @@ def check_lecture(data: dict) -> str | None:
     if not isinstance(data.get("title"), str) or not data["title"].strip():
         return "missing title"
     slides = data.get("slides")
-    if not isinstance(slides, list) or len(slides) < CFG["slides"]:
-        return f"need {CFG['slides']} slides"
+    # A couple of slides short is a trim problem, not a rejection: demanding
+    # exactly N well-formed slides from a small model kills whole builds over
+    # cosmetics. Structural failures still reject.
+    if not isinstance(slides, list) or len(slides) < max(3, CFG["slides"] - 2):
+        return f"need at least {max(3, CFG['slides'] - 2)} slides"
     for slide in slides[: CFG["slides"]]:
         if not isinstance(slide.get("heading"), str) or not slide["heading"].strip():
             return "a slide is missing its heading"
         bullets = slide.get("bullets")
-        if not isinstance(bullets, list) or not (2 <= len(bullets) <= 5):
-            return "each slide needs 2-5 bullets"
-        if not all(isinstance(b, str) and b.strip() for b in bullets):
-            return "empty bullet"
+        if not isinstance(bullets, list) or not any(
+            isinstance(b, str) and b.strip() for b in bullets
+        ):
+            return "each slide needs at least one bullet"
         if not isinstance(slide.get("narration"), str) or len(slide["narration"].split()) < 15:
             return "each slide needs spoken narration of at least 15 words"
         if not isinstance(slide.get("page"), int):
@@ -238,6 +241,8 @@ def generate_week(week: int, pages: list[tuple[int, str]]) -> dict:
         # never trust a model with page numbers: clamp to the pages it was shown
         if slide["page"] not in valid_pages:
             slide["page"] = min(valid_pages, key=lambda p: abs(p - slide["page"]))
+        # coerce cosmetic bullet violations instead of failing the build
+        slide["bullets"] = [b.strip() for b in slide["bullets"] if isinstance(b, str) and b.strip()][:5]
     return data
 
 
