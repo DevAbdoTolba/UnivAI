@@ -36,12 +36,22 @@ from common.llm import complete, LLMError  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 LECTURES_DIR = ROOT / "lectures"
 WEEKS = 4
-SLIDES_PER_WEEK = 3
+
+# The course size dial (settings.course_size, set from the admin page). One
+# knob scales the lecture and the quiz bank together. The app holds the SAME
+# table in app/lib/course-size.ts — keep them in sync.
 # The quiz bank per week: >=90% of any served paper must be answerable from
 # what the lecturer SAID (easy if you attended); self-study questions from the
 # wider pages exist but can never exceed 10% of a paper.
-LECTURE_QUESTIONS = 8
-SELF_STUDY_QUESTIONS = 2
+SIZES = {
+    "XS": {"slides": 3, "narration": "4-6", "lecture_qs": 8, "self_qs": 2},
+    "S": {"slides": 5, "narration": "4-6", "lecture_qs": 10, "self_qs": 2},
+    "M": {"slides": 8, "narration": "5-7", "lecture_qs": 14, "self_qs": 3},
+    "L": {"slides": 12, "narration": "6-8", "lecture_qs": 18, "self_qs": 4},
+    "XL": {"slides": 16, "narration": "6-9", "lecture_qs": 22, "self_qs": 5},
+}
+# Filled in main() from the settings table; XS keeps the original behaviour.
+CFG = SIZES["XS"]
 # A 3B model with an 8k window: keep the source well under it.
 MAX_SOURCE_CHARS = 12000
 MAX_CHARS_PER_PAGE = 1500
@@ -182,9 +192,9 @@ def check_lecture(data: dict) -> str | None:
     if not isinstance(data.get("title"), str) or not data["title"].strip():
         return "missing title"
     slides = data.get("slides")
-    if not isinstance(slides, list) or len(slides) < SLIDES_PER_WEEK:
-        return f"need {SLIDES_PER_WEEK} slides"
-    for slide in slides[:SLIDES_PER_WEEK]:
+    if not isinstance(slides, list) or len(slides) < CFG["slides"]:
+        return f"need {CFG['slides']} slides"
+    for slide in slides[: CFG["slides"]]:
         if not isinstance(slide.get("heading"), str) or not slide["heading"].strip():
             return "a slide is missing its heading"
         bullets = slide.get("bullets")
@@ -212,16 +222,17 @@ def generate_week(week: int, pages: list[tuple[int, str]]) -> dict:
         '  "intro": "2 spoken sentences welcoming students and saying what this lecture covers",\n'
         '  "slides": [\n'
         '    {"heading": "...", "bullets": ["...", "...", "..."], '
-        '"narration": "4-6 spoken sentences explaining this slide", "page": <page number the content came from>}\n'
+        f'"narration": "{CFG["narration"]} spoken sentences explaining this slide", "page": <page number the content came from>}}\n'
         "  ]\n"
         "}\n\n"
-        f"Rules: exactly {SLIDES_PER_WEEK} slides. Bullets are short phrases (under 12 words). "
+        f"Rules: exactly {CFG['slides']} slides. Bullets are short phrases (under 12 words). "
         "Narration is natural speech - no bullet symbols, no 'as you can see'. "
         f'"page" must be one of {valid_pages}.\n\n'
         "Textbook pages:\n" + source_block(pages)
     )
-    data = ask_json(prompt, LECTURE_SYSTEM, 1600, check_lecture)
-    data["slides"] = data["slides"][:SLIDES_PER_WEEK]
+    # Bigger sizes produce longer JSON: give the reply room to finish.
+    data = ask_json(prompt, LECTURE_SYSTEM, 800 + 260 * CFG["slides"], check_lecture)
+    data["slides"] = data["slides"][: CFG["slides"]]
     for slide in data["slides"]:
         # never trust a model with page numbers: clamp to the pages it was shown
         if slide["page"] not in valid_pages:
@@ -271,7 +282,9 @@ def lecture_text(title: str, segments: list[dict]) -> str:
 def ask_questions(prompt: str, count: int, source: str, minimum: int | None = None) -> list[dict]:
     # Accept a short reply rather than failing a whole course build — a 3-minute
     # lecture honestly supports about 5 distinct easy questions, not always 8.
-    data = ask_json(prompt, QUIZ_SYSTEM, 1800, check_quiz(minimum or max(1, count - 2)))
+    data = ask_json(
+        prompt, QUIZ_SYSTEM, max(1800, 300 + 160 * count), check_quiz(minimum or max(1, count - 2))
+    )
 
     # The exam system's shape: options carry the letter label, correct_option is
     # the letter. `source` says whether the lecturer taught it or it is homework.
@@ -299,24 +312,24 @@ def generate_quiz(
     # 1) The bulk of the bank: questions a student who WATCHED the lecture finds
     #    easy — every answer must have been said out loud by the lecturer.
     taught = ask_questions(
-        f'Write {LECTURE_QUESTIONS} multiple-choice questions testing ONLY what this lecturer '
+        f'Write {CFG["lecture_qs"]} multiple-choice questions testing ONLY what this lecturer '
         "actually said. Every correct answer must be stated explicitly in the lecture below - "
         "a student who watched it should find these easy. Do not ask about anything the "
         "lecture does not mention.\n\n" + QUESTION_SHAPE +
         "The lecture:\n" + lecture_text(title, segments),
-        LECTURE_QUESTIONS,
+        CFG["lecture_qs"],
         "lecture",
-        # a full quiz is 5 questions, all lecturer-taught: that is the floor
+        # a full quiz paper must be coverable by lecturer-taught questions
         minimum=5,
     )
 
     # 2) The small self-study tail: from the week's wider pages, beyond the slides.
     homework = ask_questions(
-        f'Write {SELF_STUDY_QUESTIONS} multiple-choice SELF-STUDY questions for the week on '
+        f'Write {CFG["self_qs"]} multiple-choice SELF-STUDY questions for the week on '
         f'"{title}", using ONLY these textbook pages. Pick details a short lecture would not '
         "have covered - the student is expected to have read the pages themselves.\n\n"
         + QUESTION_SHAPE + "Textbook pages:\n" + source_block(pages),
-        SELF_STUDY_QUESTIONS,
+        CFG["self_qs"],
         "self_study",
     )
     return taught + homework
@@ -431,6 +444,14 @@ def main() -> int:
     if not fetch_one("SELECT id FROM books WHERE id = %s", (book_id,)):
         print(json.dumps({"ok": False, "error": f"no book with id {book_id}"}))
         return 2
+
+    # The admin's size dial. Set on the admin page, honoured here.
+    global CFG
+    size_row = fetch_one("SELECT value FROM settings WHERE key = 'course_size'")
+    size = (size_row or {}).get("value", "XS")
+    CFG = SIZES.get(size, SIZES["XS"])
+    print(f"[lecture-gen] course size: {size} ({CFG['slides']} slides, "
+          f"{CFG['lecture_qs']}+{CFG['self_qs']} questions per week)", flush=True)
 
     try:
         progress(book_id, "Reading the book…")

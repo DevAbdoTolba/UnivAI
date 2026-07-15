@@ -5,6 +5,8 @@ import { env } from "./env";
 import { query, queryOne } from "./db";
 import { now, HOUR_MS, DAY_MS } from "./clock";
 import { getLectures, LECTURES_DIR } from "./lectures";
+import { COURSE_SIZES, DEFAULT_SIZE, isCourseSize } from "./course-size";
+import { getSetting } from "./settings";
 
 /**
  * Integration with the team's exam system (UnivAI-exam_system, port 3200).
@@ -325,13 +327,21 @@ export async function startExam(kind: "quiz" | "mid", week: number | null): Prom
   // assembles the exam — this is what makes the quiz be about the lecture.
   await syncQuestionBanks(link);
 
+  // The admin's course-size dial decides how big the paper is.
+  const sizeValue = await getSetting("course_size");
+  const paper = COURSE_SIZES[isCourseSize(sizeValue) ? sizeValue : DEFAULT_SIZE];
+
   if (kind === "quiz") {
     const chapter = link.chapters.find((c) => c.week === week);
     if (!chapter) throw new Error("No chapter for that week.");
     const res = await fetch(`${EXAM_SYSTEM_URL}/api/exams/quiz/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ student_id: link.student_id, chapter_id: chapter.chapter_id }),
+      body: JSON.stringify({
+        student_id: link.student_id,
+        chapter_id: chapter.chapter_id,
+        question_count: paper.quizPaper,
+      }),
     });
     const exam = await res.json();
     if (!res.ok) throw new Error(exam.error ?? "The exam system refused to start the quiz.");
@@ -341,6 +351,8 @@ export async function startExam(kind: "quiz" | "mid", week: number | null): Prom
   if (!link.mid_exam_id) throw new Error("The midterm was not created yet — is the exam system running?");
   const res = await fetch(`${EXAM_SYSTEM_URL}/api/exams/mid/${link.mid_exam_id}/start`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question_count: paper.midPaper }),
   });
   const exam = await res.json();
   if (!res.ok) throw new Error(exam.error ?? "The exam system refused to start the midterm.");

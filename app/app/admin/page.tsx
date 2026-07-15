@@ -17,8 +17,13 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { formatCountdown, formatDateTime, formatLateness, formatRelative } from "@/lib/time";
+
+type CourseSize = "XS" | "S" | "M" | "L" | "XL";
+type SizeInfo = { slides: number; quizPaper: number; midPaper: number; blurb: string };
 
 type AdminState = {
   clock: { now: string; offsetMs: number };
@@ -65,6 +70,8 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [isoInput, setIsoInput] = useState("");
+  const [size, setSize] = useState<CourseSize>("XS");
+  const [sizes, setSizes] = useState<Record<CourseSize, SizeInfo> | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -79,7 +86,44 @@ export default function AdminPage() {
 
   useEffect(() => {
     load();
+    fetch("/api/admin/generate", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        setSize(data.size);
+        setSizes(data.sizes);
+      })
+      .catch(() => undefined);
   }, [load]);
+
+  const building =
+    state?.books.some((book) => book.status === "generating" || book.status === "ingesting") ??
+    false;
+
+  // While a build runs, keep the book status fresh so the admin sees it finish.
+  useEffect(() => {
+    if (!building) return;
+    const poll = setInterval(load, 5_000);
+    return () => clearInterval(poll);
+  }, [building, load]);
+
+  async function regenerate(mode: "full" | "quizzes") {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ size, mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "regeneration failed to start");
+      setError(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "regeneration failed to start");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function control(body: Record<string, unknown>) {
     setBusy(true);
@@ -224,6 +268,73 @@ export default function AdminPage() {
               </Table>
             ) : (
               <Typography color="text.secondary">No book uploaded yet.</Typography>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="h6">Course size</Typography>
+            <Typography variant="body2" color="text.secondary">
+              One dial for how big the course is: slides and spoken length per lecture,
+              and how many questions each quiz and the midterm carry. Regenerating
+              rebuilds from the already-uploaded book.
+            </Typography>
+
+            <ToggleButtonGroup
+              exclusive
+              color="primary"
+              value={size}
+              onChange={(_event, value) => value && setSize(value as CourseSize)}
+              disabled={busy || building}
+            >
+              {(["XS", "S", "M", "L", "XL"] as CourseSize[]).map((option) => (
+                <ToggleButton key={option} value={option}>
+                  {option}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+
+            {sizes ? (
+              <Typography variant="body2" color="text.secondary">
+                {size} — {sizes[size].blurb}. Midterm: {sizes[size].midPaper} questions.
+                {size === "M" ? " (the normal lecture)" : ""}
+              </Typography>
+            ) : null}
+
+            <Grid container spacing={2}>
+              <Grid>
+                <Button
+                  variant="contained"
+                  disabled={busy || building}
+                  onClick={() => regenerate("full")}
+                >
+                  Regenerate course
+                </Button>
+              </Grid>
+              <Grid>
+                <Button
+                  variant="outlined"
+                  disabled={busy || building}
+                  onClick={() => regenerate("quizzes")}
+                >
+                  Regenerate quizzes only
+                </Button>
+              </Grid>
+            </Grid>
+
+            {building ? (
+              <Alert severity="info">
+                Building… follow the progress on the Upload page. Lectures, quizzes and
+                the lecturer&apos;s voice are rewritten; quizzes-only is much faster.
+              </Alert>
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                A full rebuild rewrites lectures, quizzes, slides and the pre-recorded
+                voice; quizzes-only keeps the lectures and rewrites the question banks.
+              </Typography>
             )}
           </Stack>
         </CardContent>

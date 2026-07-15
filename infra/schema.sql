@@ -80,3 +80,9 @@ ALTER TABLE grades ADD COLUMN IF NOT EXISTS report JSONB;
 -- Where lecture generation currently is ("Writing lecture 2 of 4…"), shown on
 -- the upload page while the course is being built from the book.
 ALTER TABLE books ADD COLUMN IF NOT EXISTS progress TEXT;
+
+-- Small key/value admin settings (e.g. course_size: XS | S | M | L | XL).
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

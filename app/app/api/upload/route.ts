@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { spawn } from "child_process";
-import { promises as fs, openSync } from "fs";
+import { promises as fs } from "fs";
 import path from "path";
 import { query, queryOne } from "@/lib/db";
 import { now } from "@/lib/clock";
-import { runPython, parseJsonLine, REPO_ROOT, VENV_PYTHON } from "@/lib/python";
+import { runPython, parseJsonLine, REPO_ROOT } from "@/lib/python";
 import { resetExamWorld } from "@/lib/exams";
+import { spawnGeneration } from "@/lib/generation";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -55,25 +55,6 @@ async function resetCourse(): Promise<void> {
   await query("DELETE FROM lectures");
   await query("DELETE FROM books");
   await resetExamWorld();
-}
-
-/** Fire lecture generation and let it outlive this request. */
-function spawnGeneration(pdfPath: string, bookId: number): void {
-  const log = openSync(path.join(REPO_ROOT, "lecture-gen.log"), "a");
-  const child = spawn(
-    VENV_PYTHON,
-    [path.join(REPO_ROOT, "services", "lecture_gen.py"), pdfPath, String(bookId)],
-    {
-      cwd: REPO_ROOT,
-      windowsHide: true,
-      detached: true,
-      stdio: ["ignore", log, log],
-      // Log lines carry generated lecture titles; without this, one character
-      // outside the console codepage kills the whole run with UnicodeEncodeError.
-      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
-    }
-  );
-  child.unref();
 }
 
 export async function POST(request: NextRequest) {
