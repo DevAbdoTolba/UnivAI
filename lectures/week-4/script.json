@@ -1,40 +1,85 @@
 {
   "lectureId": "week-4",
-  "title": "Dataflow Systems",
+  "title": "Message Brokers and Processing Streams",
   "segments": [
     {
       "slide": 1,
-      "text": "Welcome to lecture 4. In this lecture, we will discuss dataflow systems, which provide data management services for many applications without requiring coordination. We will explore how these systems can achieve better performance and fault tolerance than traditional systems that need synchronous coordination.",
+      "text": "Welcome back. In this lecture, we will cover message brokers and processing streams.",
       "citations": [
         {
-          "page": 529
+          "page": 465
         }
       ]
     },
     {
       "slide": 2,
-      "text": "A dataflow system is a type of distributed system that provides data management services without requiring coordination. This means that the application code can focus on processing data, without worrying about the underlying data storage and retrieval mechanisms.",
+      "text": "Message brokers act as a central hub where producers send messages, and consumers receive them. They are optimized specifically for managing large volumes of messages in real-time.",
       "citations": [
         {
-          "page": 529
+          "page": 465
         }
       ]
     },
     {
       "slide": 3,
-      "text": "In a dataflow system, the application code responds to state changes by triggering state changes in another place. This implies that the relationship between application code and state management is renegotiated.",
+      "text": "While direct messaging systems work well for specific use cases, they require the application to be aware of potential message loss. In contrast, message brokers handle this by centralizing the messages, making them more robust.",
       "citations": [
         {
-          "page": 530
+          "page": 465
         }
       ]
     },
     {
       "slide": 4,
-      "text": "Dataflow systems can provide data management services without requiring coordination, while still giving strong integrity guarantees. This means that the system can achieve better performance and fault tolerance than traditional systems that need synchronous coordination.",
+      "text": "Once you have a stream of data, there are three primary ways to process it. You can store the data in a database or cache, push events to users, or create new streams from existing ones.",
       "citations": [
         {
-          "page": 571
+          "page": 486
+        }
+      ]
+    },
+    {
+      "slide": 5,
+      "text": "One option is to store the events in a database, cache, or search index. This keeps your data up-to-date and allows for querying by other clients.",
+      "citations": [
+        {
+          "page": 486
+        }
+      ]
+    },
+    {
+      "slide": 6,
+      "text": "Another option is to push events directly to users. This can be done through user interfaces like dashboards or by sending push notifications and emails.",
+      "citations": [
+        {
+          "page": 486
+        }
+      ]
+    },
+    {
+      "slide": 7,
+      "text": "The third option involves processing one or more input streams to generate new output streams. This can involve complex data transformations and analytics.",
+      "citations": [
+        {
+          "page": 486
+        }
+      ]
+    },
+    {
+      "slide": 8,
+      "text": "Dataflow systems offer a way to manage data without requiring constant coordination. They can provide strong integrity guarantees while achieving better performance and fault tolerance.",
+      "citations": [
+        {
+          "page": 550
+        }
+      ]
+    },
+    {
+      "slide": 9,
+      "text": "In summary, we've covered how message brokers handle messages in a centralized manner. We also discussed the various ways to process streams: storage, user notifications, and stream processing. These techniques are crucial for managing data in modern applications.",
+      "citations": [
+        {
+          "page": 613
         }
       ]
     }

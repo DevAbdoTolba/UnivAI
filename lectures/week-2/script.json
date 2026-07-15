@@ -1,10 +1,10 @@
 {
   "lectureId": "week-2",
-  "title": "Distributed Systems Consistency",
+  "title": "Lecture 2: Consistency Models",
   "segments": [
     {
       "slide": 1,
-      "text": "Welcome to lecture 2 of our course on distributed systems. In this lecture, we will discuss consistency in distributed systems and how it relates to ACID properties.",
+      "text": "Welcome to Lecture 2. Today we will discuss consistency models and their importance in database systems.",
       "citations": [
         {
           "page": 247
@@ -13,7 +13,7 @@
     },
     {
       "slide": 2,
-      "text": "The ACID properties are a set of principles that ensure the consistency and reliability of distributed transactions. Atomicity ensures that all or nothing is committed, Consistency ensures that data remains consistent across all nodes, Isolation ensures that concurrent transactions do not interfere with each other, and Durability ensures that once committed, data is permanent.",
+      "text": "ACID is a set of properties that ensure database transactions are processed reliably. Atomicity ensures that all or nothing is committed, consistency ensures data remains consistent, independence ensures concurrent transactions do not interfere with each other, and durability ensures once committed, the transaction is stable.",
       "citations": [
         {
           "page": 247
@@ -22,7 +22,7 @@
     },
     {
       "slide": 3,
-      "text": "In replicated databases, conflict resolution and replication are crucial to prevent lost updates. Locks and compare-and-set operations assume a single up-to-date copy of the data, but multi-leader or leaderless replication allows for concurrent writes and asynchronous replication.",
+      "text": "There are two types of consistency models: strong consistency and weak consistency. Strong consistency ensures all nodes have the same data at the same time, while weak consistency allows for a delay between updates on different nodes.",
       "citations": [
         {
           "page": 268
@@ -31,10 +31,55 @@
     },
     {
       "slide": 4,
-      "text": "Lost updates occur when a transaction overwrites another's write without incorporating its changes. Weak isolation levels protect against some anomalies but leave others to be handled manually. Phantom reads require special treatment, such as index-range locks.",
+      "text": "When multiple clients write to the same data simultaneously, conflict resolution techniques are used. Locks and compare-and-set operations assume a single up-to-date copy of the data, while version vectors track changes made by each client.",
       "citations": [
         {
           "page": 289
+        }
+      ]
+    },
+    {
+      "slide": 5,
+      "text": "Isolation levels control how concurrent transactions interact with each other. From weakest to strongest, the isolation levels are: read uncommitted, read committed, repeatable read, and serializable.",
+      "citations": [
+        {
+          "page": 311
+        }
+      ]
+    },
+    {
+      "slide": 6,
+      "text": "A monotonic clock measures time in a consistent manner. NTP synchronizes clocks across systems to ensure accurate timekeeping.",
+      "citations": [
+        {
+          "page": 247
+        }
+      ]
+    },
+    {
+      "slide": 7,
+      "text": "In distributed systems, quorum consistency ensures data is available on a majority of nodes. Key range partitioning divides data into ranges to reduce contention.",
+      "citations": [
+        {
+          "page": 203
+        }
+      ]
+    },
+    {
+      "slide": 8,
+      "text": "Data replication involves copying data across multiple nodes. Master-slave replication uses a single leader node, while multi-leader replication allows concurrent writes.",
+      "citations": [
+        {
+          "page": 182
+        }
+      ]
+    },
+    {
+      "slide": 9,
+      "text": "Partitioning schemes divide data into ranges or groups. Hash partitioning uses a hash function to determine the range, while range partitioning divides data based on a key.",
+      "citations": [
+        {
+          "page": 225
         }
       ]
     }

@@ -1,125 +1,185 @@
 {
   "week": 3,
-  "title": "Fault Tolerance and Consensus",
+  "title": "Distributed Systems Fundamentals",
   "questions": [
     {
-      "prompt": "What can affect NTP synchronization?",
+      "prompt": "A system must be able to tolerate failures in order to maintain which aspect of its operation?",
       "type": "mcq",
       "options": [
-        "A) Network Delays",
-        "B) Fault Tolerance",
-        "C) Consensus",
-        "D) Distributed Systems"
+        "A) availability",
+        "B) consistency",
+        "C) reliability",
+        "D) durability"
       ],
       "correct_option": "A",
       "source": "lecture"
     },
     {
-      "prompt": "Why is it challenging to achieve consensus across nodes?",
+      "prompt": "Consistency in a distributed system is achieved by ensuring that all nodes agree on the state of the system through which type of consensus algorithm?",
       "type": "mcq",
       "options": [
-        "A) Because of network delays",
-        "B) Due to hardware failures",
-        "C) Even with multiple servers",
-        "D) In a centralized system"
+        "A) leader-based",
+        "B) peer-to-peer",
+        "C) centralized",
+        "D) distributed"
+      ],
+      "correct_option": "B",
+      "source": "lecture"
+    },
+    {
+      "prompt": "Fault-tolerant systems use tools like ZooKeeper to ensure that the system can continue to operate even in the presence of which type of failures?",
+      "type": "mcq",
+      "options": [
+        "A) temporary",
+        "B) permanent",
+        "C) hardware-related",
+        "D) software-related"
+      ],
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "Reliability in a distributed system is achieved by ensuring that data is stored and managed through which type of storage solution?",
+      "type": "mcq",
+      "options": [
+        "A) centralized",
+        "B) distributed",
+        "C) hierarchical",
+        "D) flat"
       ],
       "correct_option": "C",
       "source": "lecture"
     },
     {
-      "prompt": "What do we want to ensure in a distributed system?",
+      "prompt": "MapReduce is used for which purpose in distributed systems?",
       "type": "mcq",
       "options": [
-        "A) Nonlinearizable behavior",
-        "B) Linear order operations",
-        "C) Fault tolerance",
-        "D) System consistency"
-      ],
-      "correct_option": "B",
-      "source": "lecture"
-    },
-    {
-      "prompt": "Can multiple servers improve the accuracy of time synchronization?",
-      "type": "mcq",
-      "options": [
-        "A) Yes, always",
-        "B) No, never",
-        "C) It depends on network delays",
-        "D) The answer is unknown"
+        "A) data processing",
+        "B) message queuing",
+        "C) file management",
+        "D) networking"
       ],
       "correct_option": "A",
       "source": "lecture"
     },
     {
-      "prompt": "What can happen with variable network delays in a distributed system?",
+      "prompt": "Message queuing is used to ensure that messages are delivered reliably through which mechanism?",
       "type": "mcq",
       "options": [
-        "A) Nonlinearizable behavior will not occur",
-        "B) Linearizable behavior will always occur",
-        "C) Nonlinearizable behavior may occur",
-        "D) Consensus will be achieved"
+        "A) batch processing",
+        "B) real-time processing",
+        "C) buffering and queuing",
+        "D) caching"
       ],
       "correct_option": "C",
       "source": "lecture"
     },
     {
-      "prompt": "Why is fault detection and consensus important?",
+      "prompt": "Distributed file systems like HDFS provide a way to store and manage large amounts of data in which manner?",
       "type": "mcq",
       "options": [
-        "A) Because it's fun to do",
-        "B) To ensure system consistency",
-        "C) For the sake of network delays",
-        "D) In a centralized system"
+        "A) centralized storage",
+        "B) distributed storage",
+        "C) shared storage",
+        "D) private storage"
       ],
       "correct_option": "B",
       "source": "lecture"
     },
     {
-      "prompt": "Can distributed systems handle failures?",
+      "prompt": "Consensus algorithms are used to ensure consistency in distributed systems by ensuring that all nodes agree on the state of the system through a process called what?",
       "type": "mcq",
       "options": [
-        "A) No, always",
-        "B) Yes, never",
-        "C) It depends on the type of failure",
-        "D) The answer is unknown"
+        "A) leader election",
+        "B) node synchronization",
+        "C) data replication",
+        "D) state agreement"
+      ],
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "Fault-tolerant systems use tools like ZooKeeper to detect and respond to which type of faults in the system?",
+      "type": "mcq",
+      "options": [
+        "A) temporary",
+        "B) permanent",
+        "C) hardware-related",
+        "D) software-related"
       ],
       "correct_option": "A",
       "source": "lecture"
     },
     {
-      "prompt": "What do we need to ensure in a distributed system?",
+      "prompt": "Reliability in a distributed system is achieved by ensuring that data is stored and managed through which type of storage solution?",
       "type": "mcq",
       "options": [
-        "A) Nonlinearizable behavior will occur",
-        "B) System consistency is guaranteed",
-        "C) Fault tolerance is not necessary",
-        "D) Consensus is always required"
+        "A) centralized",
+        "B) distributed",
+        "C) hierarchical",
+        "D) flat"
+      ],
+      "correct_option": "C",
+      "source": "lecture"
+    },
+    {
+      "prompt": "Message queuing is used to ensure that messages are delivered reliably by buffering and queuing them in which manner?",
+      "type": "mcq",
+      "options": [
+        "A) real-time processing",
+        "B) batch processing",
+        "C) caching",
+        "D) buffering and queuing"
       ],
       "correct_option": "B",
       "source": "lecture"
     },
     {
-      "prompt": "If a node is accidentally firewalled off from NTP servers, what may happen to its synchronization accuracy?",
+      "prompt": "Consistency in a distributed system is ensured through the use of which type of consensus algorithm?",
       "type": "mcq",
       "options": [
-        "A) A minimum error of 35 ms is achievable",
-        "B) The network delay becomes more accurate",
-        "C) The NTP client gives up entirely",
-        "D) The system crashes"
+        "A) centralized",
+        "B) distributed",
+        "C) leader-based",
+        "D) peer-to-peer"
       ],
-      "correct_option": "A",
-      "source": "self_study"
+      "correct_option": "D",
+      "source": "lecture"
     },
     {
-      "prompt": "What happens if a transaction has been committed on one node, but not on others?",
+      "prompt": "Fault-tolerant systems use tools like ZooKeeper to ensure that the system can continue to operate even in the presence of permanent failures by using which mechanism?",
       "type": "mcq",
       "options": [
-        "A) The nodes become inconsistent with each other",
-        "B) The transaction is automatically retried",
-        "C) The commit record is rolled back",
-        "D) The system crashes"
+        "A) node replication",
+        "B) data redundancy",
+        "C) state agreement",
+        "D) leader election"
       ],
       "correct_option": "A",
+      "source": "lecture"
+    },
+    {
+      "prompt": "Reliability in a distributed system is achieved by ensuring that data is stored and managed through a storage solution that provides durability and availability.",
+      "type": "mcq",
+      "options": [
+        "A) centralized",
+        "B) distributed",
+        "C) hierarchical",
+        "D) flat"
+      ],
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What is a potential issue when NTP synchronization occurs over a congested network?",
+      "type": "mcq",
+      "options": [
+        "A) A. The system may not detect node failures",
+        "B) B. There could be occasional spikes in time error up to a second",
+        "C) C. Erasure coding can improve performance",
+        "D) D. MapReduce is always the best programming model"
+      ],
+      "correct_option": "B",
       "source": "self_study"
     }
   ]

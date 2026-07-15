@@ -236,6 +236,9 @@ def generate_week(week: int, pages: list[tuple[int, str]]) -> dict:
     # Bigger sizes produce longer JSON: give the reply room to finish. A small
     # model narrates verbosely — an M-size reply got cut at 260 tokens/slide.
     data = ask_json(prompt, LECTURE_SYSTEM, 800 + 340 * CFG["slides"], check_lecture)
+    # "Lecture 2: Consistency Models" — the deck already says Week N, and the
+    # colon broke the deck's YAML headmatter once. Strip the redundant prefix.
+    data["title"] = re.sub(r"^Lecture\s*\d+\s*[:\-–—]\s*", "", data["title"].strip())
     data["slides"] = data["slides"][: CFG["slides"]]
     for slide in data["slides"]:
         # never trust a model with page numbers: clamp to the pages it was shown
@@ -351,11 +354,13 @@ def write_week(week: int, lecture: dict, quiz: list[dict]) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     title = lecture["title"].strip()
 
+    yaml_title = f"Week {week} — {title}".replace('"', "'")
     deck = [
         "---",
         "theme: default",
         "routerMode: hash",
-        f"title: Week {week} — {title}",
+        # quoted: a colon inside an unquoted YAML value kills the whole build
+        f'title: "{yaml_title}"',
         "---",
         "",
         f"# Week {week}",

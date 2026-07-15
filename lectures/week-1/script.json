@@ -1,10 +1,10 @@
 {
   "lectureId": "week-1",
-  "title": "Data Systems Design",
+  "title": "Designing Data-Intensive Applications",
   "segments": [
     {
       "slide": 1,
-      "text": "Welcome to Data Systems Design. In this course, we will explore the key concepts and techniques for designing reliable, scalable, and maintainable systems.",
+      "text": "Welcome to our course on designing reliable, scalable, and maintainable systems. In this lecture, we will explore the big ideas behind data systems and how to design them.",
       "citations": [
         {
           "page": 1
@@ -13,7 +13,7 @@
     },
     {
       "slide": 2,
-      "text": "When designing a data system or service, we need to consider several key factors. We want our system to be reliable, scalable, and maintainable.",
+      "text": "When designing a data system, we need to consider several key factors. How do we ensure that the data remains correct and complete? How do we provide consistently good performance to clients? And how do we scale to handle an increase in load?",
       "citations": [
         {
           "page": 1
@@ -22,7 +22,7 @@
     },
     {
       "slide": 3,
-      "text": "Data models are a crucial part of developing software. They have a profound effect on how we think about the problem that we are solving.",
+      "text": "When combining several tools to provide a service, the API usually hides those implementation details from clients. This creates a new, special-purpose data system with certain guarantees.",
       "citations": [
         {
           "page": 27
@@ -31,10 +31,55 @@
     },
     {
       "slide": 4,
-      "text": "MapReduce is a programming model for distributed execution on a cluster of machines. It can be used to implement higher-level query languages like SQL.",
+      "text": "Data models are crucial in developing software. We need to represent the real world in terms of data structures and express those data models in general-purpose formats.",
+      "citations": [
+        {
+          "page": 49
+        }
+      ]
+    },
+    {
+      "slide": 5,
+      "text": "MapReduce is a powerful tool for distributed execution on a cluster of machines. It's a low-level programming model that can be used to implement higher-level query languages like SQL.",
       "citations": [
         {
           "page": 70
+        }
+      ]
+    },
+    {
+      "slide": 6,
+      "text": "The world's simplest database is implemented as two Bash functions. These functions show how data structures can be used to power a database.",
+      "citations": [
+        {
+          "page": 92
+        }
+      ]
+    },
+    {
+      "slide": 7,
+      "text": "There is a difference between OLTP and OLAP systems. OLTP systems are used for transactional data, while OLAP systems are used for analytical data.",
+      "citations": [
+        {
+          "page": 113
+        }
+      ]
+    },
+    {
+      "slide": 8,
+      "text": "There are several issues with JSON, XML, and CSV. Ambiguity around encoding numbers is a problem, as well as translation of datatypes between languages.",
+      "citations": [
+        {
+          "page": 136
+        }
+      ]
+    },
+    {
+      "slide": 9,
+      "text": "Despite the problems with RPC, it's not going away. A new generation of RPC frameworks is emerging, which explicitly differentiate between remote requests and local function calls.",
+      "citations": [
+        {
+          "page": 157
         }
       ]
     }

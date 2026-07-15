@@ -1,35 +1,81 @@
 ---
 theme: default
 routerMode: hash
-title: Week 3 — Fault Tolerance and Consensus
+title: "Week 3 — Distributed Systems Fundamentals"
 ---
 
 # Week 3
-## Fault Tolerance and Consensus
+## Distributed Systems Fundamentals
 
 ---
 
-# Network Delays and NTP Synchronization
+# Fault Tolerance
 
-- Node firewalls may go unnoticed for some time
-- NTP synchronization is limited by network delay
+- Detection
+- Tolerance
+- Response
 
 <small>Source: p.312</small>
 
 ---
 
-# Fault Tolerance and Consensus
+# Consistency
 
-- Detecting faults is hard
-- Timeouts can’t distinguish between network and node failures
+- Strong Consistency
+- Weak Consistency
 
-<small>Source: p.333</small>
+<small>Source: p.356</small>
 
 ---
 
-# Linearizability and Quorums
+# Reliability
 
-- Strict quorum reads are linearizable
-- However, nonlinearizable behavior is possible due to clock skew
+- Durability
+- Availability
 
-<small>Source: p.356</small>
+<small>Source: p.441</small>
+
+---
+
+# Consensus Algorithms
+
+- Leader-Based
+- Peer-to-Peer
+
+<small>Source: p.397</small>
+
+---
+
+# Fault-Tolerant Systems
+
+- ZooKeeper
+- Message Queueing
+
+<small>Source: p.420</small>
+
+---
+
+# Distributed File Systems
+
+- HDFS
+- GlusterFS
+
+<small>Source: p.441</small>
+
+---
+
+# Beyond MapReduce
+
+- Pig
+- Hive
+
+<small>Source: p.464</small>
+
+---
+
+# Message Queuing
+
+- Buffering
+- Queueing
+
+<small>Source: p.397</small>

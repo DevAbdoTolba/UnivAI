@@ -1,10 +1,10 @@
 {
   "lectureId": "week-3",
-  "title": "Fault Tolerance and Consensus",
+  "title": "Distributed Systems Fundamentals",
   "segments": [
     {
       "slide": 1,
-      "text": "Welcome to our lecture on fault tolerance and consensus. In this lecture, we will discuss how distributed systems can handle failures and achieve consistency across nodes.",
+      "text": "Welcome to our lecture on distributed systems fundamentals. In this lecture, we will cover some of the key concepts in distributed systems, including fault tolerance, consistency, and reliability.",
       "citations": [
         {
           "page": 312
@@ -13,7 +13,7 @@
     },
     {
       "slide": 2,
-      "text": "As we discussed earlier, network delays can affect NTP synchronization. This means that even with multiple servers, the accuracy of the time can be limited.",
+      "text": "Distributed systems must be able to tolerate failures in order to maintain availability. This involves detecting faults, tolerating failures, and responding to them.",
       "citations": [
         {
           "page": 312
@@ -22,19 +22,64 @@
     },
     {
       "slide": 3,
-      "text": "In distributed systems, detecting faults and achieving consensus across nodes can be challenging. We need to ensure that the system continues to function even when some nodes fail.",
+      "text": "Distributed systems must ensure consistency in order to maintain data integrity. This involves ensuring that all nodes agree on the state of the system.",
       "citations": [
         {
-          "page": 333
+          "page": 356
         }
       ]
     },
     {
       "slide": 4,
-      "text": "In a distributed system, we want to ensure that operations are executed in a linear order. However, with variable network delays, it's possible for nonlinearizable behavior to occur.",
+      "text": "Distributed systems must ensure reliability in order to maintain trust. This involves ensuring that data is durable and available.",
       "citations": [
         {
-          "page": 356
+          "page": 441
+        }
+      ]
+    },
+    {
+      "slide": 5,
+      "text": "Consensus algorithms are used to ensure consistency in distributed systems. There are two main types: leader-based and peer-to-peer.",
+      "citations": [
+        {
+          "page": 397
+        }
+      ]
+    },
+    {
+      "slide": 6,
+      "text": "Fault-tolerant systems use tools like ZooKeeper to ensure that the system can continue to operate even in the presence of failures.",
+      "citations": [
+        {
+          "page": 420
+        }
+      ]
+    },
+    {
+      "slide": 7,
+      "text": "Distributed file systems are used to store and manage large amounts of data. HDFS is a popular choice for distributed file systems.",
+      "citations": [
+        {
+          "page": 441
+        }
+      ]
+    },
+    {
+      "slide": 8,
+      "text": "MapReduce is just one tool in the toolbox for distributed systems. Other tools like Pig and Hive provide higher-level abstractions for processing data.",
+      "citations": [
+        {
+          "page": 464
+        }
+      ]
+    },
+    {
+      "slide": 9,
+      "text": "Message queuing is used to ensure that messages are delivered reliably. This involves buffering and queuing messages in order to ensure delivery.",
+      "citations": [
+        {
+          "page": 397
         }
       ]
     }

@@ -1,37 +1,75 @@
 ---
 theme: default
 routerMode: hash
-title: Week 4 — Dataflow Systems
+title: "Week 4 — Message Brokers and Processing Streams"
 ---
 
 # Week 4
-## Dataflow Systems
+## Message Brokers and Processing Streams
+
+---
+
+# Message Brokers Overview
+
+- Centralized database for handling messages
+- Optimized for message streams
+
+<small>Source: p.465</small>
+
+---
+
+# Direct Messaging vs Message Brokers
+
+- Direct messaging requires application awareness
+- Message brokers centralize data
+
+<small>Source: p.465</small>
+
+---
+
+# Processing Streams
+
+- Three main options: storage, user notifications, and stream processing
+
+<small>Source: p.486</small>
+
+---
+
+# Storage Option
+
+- Write events to databases, caches, search indexes
+
+<small>Source: p.486</small>
+
+---
+
+# User Notifications
+
+- Push notifications, email alerts
+
+<small>Source: p.486</small>
+
+---
+
+# Stream Processing
+
+- Process input streams to produce output streams
+
+<small>Source: p.486</small>
 
 ---
 
 # Dataflow Systems
 
-- Provide data management services
-- No synchronization required
-- Achieve better performance and fault tolerance
+- Provide data management services without coordination
 
-<small>Source: p.529</small>
+<small>Source: p.550</small>
 
 ---
 
-# Interplay between State Changes and Application Code
+# Conclusion
 
-- Application code responds to state changes
-- Triggering state changes in another place
+- Summary of message brokers
+- Overview of stream processing options
 
-<small>Source: p.530</small>
-
----
-
-# Coordination Avoiding Data Systems
-
-- Achieve better performance
-- Fault tolerance
-- Strong integrity guarantees
-
-<small>Source: p.571</small>
+<small>Source: p.613</small>

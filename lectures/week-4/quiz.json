@@ -1,125 +1,209 @@
 {
   "week": 4,
-  "title": "Dataflow Systems",
+  "title": "Message Brokers and Processing Streams",
   "questions": [
     {
-      "prompt": "What does a dataflow system do?",
+      "prompt": "What is the primary function of a message broker?",
       "type": "mcq",
       "options": [
-        "A) focus on processing data",
-        "B) manage state changes",
-        "C) provide data management services",
-        "D) require synchronous coordination"
-      ],
-      "correct_option": "D",
-      "source": "lecture"
-    },
-    {
-      "prompt": "How does the application code respond in a dataflow system?",
-      "type": "mcq",
-      "options": [
-        "A) worry about state management",
-        "B) process data",
-        "C) trigger state changes",
-        "D) coordinate with other parts of the system"
-      ],
-      "correct_option": "C",
-      "source": "lecture"
-    },
-    {
-      "prompt": "What is renegotiated in a dataflow system?",
-      "type": "mcq",
-      "options": [
-        "A) data storage mechanisms",
-        "B) state changes",
-        "C) application code and state management",
-        "D) system performance"
-      ],
-      "correct_option": "B",
-      "source": "lecture"
-    },
-    {
-      "prompt": "What type of coordination do traditional systems need?",
-      "type": "mcq",
-      "options": [
-        "A) asynchronous",
-        "B) synchronous",
-        "C) event-driven",
-        "D) request-response"
-      ],
-      "correct_option": "C",
-      "source": "lecture"
-    },
-    {
-      "prompt": "How does a dataflow system compare to traditional systems?",
-      "type": "mcq",
-      "options": [
-        "A) worse performance and fault tolerance",
-        "B) better performance and fault tolerance",
-        "C) the same performance and fault tolerance",
-        "D) no comparison possible"
-      ],
-      "correct_option": "B",
-      "source": "lecture"
-    },
-    {
-      "prompt": "What do dataflow systems provide?",
-      "type": "mcq",
-      "options": [
-        "A) strong integrity guarantees only",
-        "B) data management services only",
-        "C) both strong integrity guarantees and data management services",
-        "D) neither strong integrity guarantees nor data management services"
-      ],
-      "correct_option": "C",
-      "source": "lecture"
-    },
-    {
-      "prompt": "Can dataflow systems achieve better performance than traditional systems?",
-      "type": "mcq",
-      "options": [
-        "A) no",
-        "B) maybe",
-        "C) yes with certain conditions",
-        "D) always"
+        "A) Manage large volumes of messages",
+        "B) Handle message loss",
+        "C) Act as a central hub",
+        "D) Store data in databases"
       ],
       "correct_option": "A",
       "source": "lecture"
     },
     {
-      "prompt": "What can dataflow systems provide without requiring coordination?",
+      "prompt": "How do direct messaging systems handle potential message loss?",
       "type": "mcq",
       "options": [
-        "A) strong integrity guarantees only",
-        "B) data management services only",
-        "C) both strong integrity guarantees and data management services",
-        "D) neither strong integrity guarantees nor data management services"
+        "A) Centralize the messages",
+        "B) Decentralize the messages",
+        "C) Store data in databases",
+        "D) Push events to users"
+      ],
+      "correct_option": "B",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What is one way to process a stream of data?",
+      "type": "mcq",
+      "options": [
+        "A) Create new streams from existing ones",
+        "B) Store the data in a database or cache",
+        "C) Push events directly to users",
+        "D) Combine multiple input streams"
+      ],
+      "correct_option": "C",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What do dataflow systems offer?",
+      "type": "mcq",
+      "options": [
+        "A) Improved user interfaces",
+        "B) Enhanced analytics capabilities",
+        "C) Strong integrity guarantees and better performance",
+        "D) Faster message delivery"
       ],
       "correct_option": "D",
       "source": "lecture"
     },
     {
-      "prompt": "The main advantage of using a message broker over direct messaging systems is that it can handle",
+      "prompt": "How can storing events in a database, cache, or search index benefit other clients?",
       "type": "mcq",
       "options": [
-        "A) limited faults",
-        "B) unbounded data streams",
-        "C) centralized data storage",
-        "D) async retry failures"
+        "A) Improve user experience",
+        "B) Reduce latency",
+        "C) Keep data up-to-date",
+        "D) Increase security"
+      ],
+      "correct_option": "C",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What is an example of pushing events directly to users?",
+      "type": "mcq",
+      "options": [
+        "A) Sending push notifications and emails",
+        "B) Storing data in a database or cache",
+        "C) Creating new streams from existing ones",
+        "D) Combining multiple input streams"
+      ],
+      "correct_option": "A",
+      "source": "lecture"
+    },
+    {
+      "prompt": "How do message brokers handle messages in a centralized manner?",
+      "type": "mcq",
+      "options": [
+        "A) Decentralize the messages",
+        "B) Store data in databases",
+        "C) Push events to users",
+        "D) Centralize the messages"
+      ],
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What is one benefit of using stream processing?",
+      "type": "mcq",
+      "options": [
+        "A) Improved user experience",
+        "B) Increased security",
+        "C) Better performance and fault tolerance",
+        "D) Enhanced analytics capabilities"
+      ],
+      "correct_option": "C",
+      "source": "lecture"
+    },
+    {
+      "prompt": "How can dataflow systems provide strong integrity guarantees?",
+      "type": "mcq",
+      "options": [
+        "A) By storing data in multiple locations",
+        "B) By pushing events directly to users",
+        "C) By creating new streams from existing ones",
+        "D) By managing data without constant coordination"
+      ],
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What is one way to manage data without requiring constant coordination?",
+      "type": "mcq",
+      "options": [
+        "A) Using direct messaging systems",
+        "B) Storing data in databases or caches",
+        "C) Pushing events directly to users",
+        "D) Managing data with dataflow systems"
+      ],
+      "correct_option": "C",
+      "source": "lecture"
+    },
+    {
+      "prompt": "How can processing one or more input streams generate new output streams?",
+      "type": "mcq",
+      "options": [
+        "A) By storing data in a database or cache",
+        "B) By pushing events directly to users",
+        "C) By creating complex data transformations and analytics",
+        "D) By combining multiple input streams"
+      ],
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What is one benefit of using message brokers?",
+      "type": "mcq",
+      "options": [
+        "A) Improved user experience",
+        "B) Increased security",
+        "C) Better performance and fault tolerance",
+        "D) Robustness in handling message loss"
+      ],
+      "correct_option": "C",
+      "source": "lecture"
+    },
+    {
+      "prompt": "How can dataflow systems achieve better performance and fault tolerance?",
+      "type": "mcq",
+      "options": [
+        "A) By storing data in multiple locations",
+        "B) By pushing events directly to users",
+        "C) By creating new streams from existing ones",
+        "D) By managing data without constant coordination"
+      ],
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "What is one way to process a stream of data for analytics?",
+      "type": "mcq",
+      "options": [
+        "A) Store the data in a database or cache",
+        "B) Push events directly to users",
+        "C) Create new streams from existing ones",
+        "D) Combine multiple input streams"
+      ],
+      "correct_option": "C",
+      "source": "lecture"
+    },
+    {
+      "prompt": "Producers can make a direct HTTP or RPC request to push messages to a consumer via webhooks.",
+      "type": "mcq",
+      "options": [
+        "A) A",
+        "B) B",
+        "C) C",
+        "D) D"
+      ],
+      "correct_option": "A",
+      "source": "self_study"
+    },
+    {
+      "prompt": "Processing streams can provide data management services for applications without requiring coordination.",
+      "type": "mcq",
+      "options": [
+        "A) A",
+        "B) B",
+        "C) C",
+        "D) D"
       ],
       "correct_option": "C",
       "source": "self_study"
     },
     {
-      "prompt": "A serializable transaction in a distributed system can be useful for maintaining",
+      "prompt": "Serializable transactions are still useful as part of maintaining derived state, but they can be run at a small scope.",
       "type": "mcq",
       "options": [
-        "A) derived state",
-        "B) event logs",
-        "C) search indexes",
-        "D) full-text search"
+        "A) A",
+        "B) B",
+        "C) C",
+        "D) D"
       ],
-      "correct_option": "A",
+      "correct_option": "B",
       "source": "self_study"
     }
   ]

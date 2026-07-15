@@ -1,38 +1,85 @@
 ---
 theme: default
 routerMode: hash
-title: Week 2 — Distributed Systems Consistency
+title: "Week 2 — Lecture 2: Consistency Models"
 ---
 
 # Week 2
-## Distributed Systems Consistency
+## Lecture 2: Consistency Models
 
 ---
 
-# ACID Properties
+# ACID
 
 - Atomicity
 - Consistency
-- Isolation
+- Independence
 - Durability
 
 <small>Source: p.247</small>
 
 ---
 
-# Conflict Resolution and Replication
+# Consistency Models
 
-- Locks
-- Compare-and-set operations
-- Multi-leader or leaderless replication
+- Strong Consistency
+- Weak Consistency
 
 <small>Source: p.268</small>
 
 ---
 
-# Lost Updates and Write Skew
+# Conflict Resolution
 
-- Phantom reads
-- Weak isolation levels
+- Locks
+- Compare-and-Set
+- Version Vector
 
 <small>Source: p.289</small>
+
+---
+
+# Isolation Levels
+
+- Read Uncommitted
+- Read Committed
+- Repeatable Read
+- Serializable
+
+<small>Source: p.311</small>
+
+---
+
+# Time and Clocks
+
+- Monotonic Clocks
+- NTP
+
+<small>Source: p.247</small>
+
+---
+
+# Distributed Systems
+
+- Quorum Consistency
+- Key Range Partitioning
+
+<small>Source: p.203</small>
+
+---
+
+# Data Replication
+
+- Master-Slave Replication
+- Multi-Leader Replication
+
+<small>Source: p.182</small>
+
+---
+
+# Partitioning Schemes
+
+- Hash Partitioning
+- Range Partitioning
+
+<small>Source: p.225</small>
