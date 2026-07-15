@@ -1,39 +1,37 @@
 ---
 theme: default
 routerMode: hash
-title: Week 4 — Review and Synthesis
+title: Week 4 — Dataflow Systems
 ---
 
 # Week 4
-## Review and Synthesis
+## Dataflow Systems
 
 ---
 
-# Pulling the threads together
+# Dataflow Systems
 
-- How weeks one to three connect
-- The single thread running through them
-- What the midterm will ask
+- Provide data management services
+- No synchronization required
+- Achieve better performance and fault tolerance
 
-<small>Source: p.10</small>
-
----
-
-# Worked review problem
-
-- A problem that uses everything
-- Solving it step by step
-- Where each week's material appears
-
-<small>Source: p.11</small>
+<small>Source: p.529</small>
 
 ---
 
-# Preparing for the midterm
+# Interplay between State Changes and Application Code
 
-- What is examinable
-- How to revise
-- Where to look in the book
+- Application code responds to state changes
+- Triggering state changes in another place
 
-<small>Source: p.12</small>
+<small>Source: p.530</small>
 
+---
+
+# Coordination Avoiding Data Systems
+
+- Achieve better performance
+- Fault tolerance
+- Strong integrity guarantees
+
+<small>Source: p.571</small>

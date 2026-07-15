@@ -1,31 +1,40 @@
 {
   "lectureId": "week-2",
-  "title": "Core Concepts",
+  "title": "Distributed Systems Consistency",
   "segments": [
     {
       "slide": 1,
-      "text": "This week we build the vocabulary of the field. These are the terms you will meet again in every later chapter, so it is worth being precise about what each one means.",
+      "text": "Welcome to lecture 2 of our course on distributed systems. In this lecture, we will discuss consistency in distributed systems and how it relates to ACID properties.",
       "citations": [
         {
-          "page": 4
+          "page": 247
         }
       ]
     },
     {
       "slide": 2,
-      "text": "The first main idea is stated plainly in the text, followed by a worked example. Pay attention to the boundaries: the book is careful about where this applies and where it does not.",
+      "text": "The ACID properties are a set of principles that ensure the consistency and reliability of distributed transactions. Atomicity ensures that all or nothing is committed, Consistency ensures that data remains consistent across all nodes, Isolation ensures that concurrent transactions do not interfere with each other, and Durability ensures that once committed, data is permanent.",
       "citations": [
         {
-          "page": 5
+          "page": 247
         }
       ]
     },
     {
       "slide": 3,
-      "text": "Finally, a word on the mistake most readers make at this point. It is a tempting one, and the book takes some trouble to correct it.",
+      "text": "In replicated databases, conflict resolution and replication are crucial to prevent lost updates. Locks and compare-and-set operations assume a single up-to-date copy of the data, but multi-leader or leaderless replication allows for concurrent writes and asynchronous replication.",
       "citations": [
         {
-          "page": 6
+          "page": 268
+        }
+      ]
+    },
+    {
+      "slide": 4,
+      "text": "Lost updates occur when a transaction overwrites another's write without incorporating its changes. Weak isolation levels protect against some anomalies but leave others to be handled manually. Phantom reads require special treatment, such as index-range locks.",
+      "citations": [
+        {
+          "page": 289
         }
       ]
     }

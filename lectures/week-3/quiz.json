@@ -1,0 +1,94 @@
+{
+  "week": 3,
+  "title": "Fault Tolerance and Consensus",
+  "questions": [
+    {
+      "prompt": "What can cause a node to be falsely suspected of crashing according to page 333?",
+      "type": "mcq",
+      "options": [
+        "A) Network congestion",
+        "B) Variable network delay",
+        "C) Driver bug",
+        "D) All of the above"
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "Why is it challenging for nodes to agree on what time it is in distributed systems as mentioned in page 333?",
+      "type": "mcq",
+      "options": [
+        "A) No shared memory",
+        "B) Lack of global variables",
+        "C) Nodes can't communicate over network",
+        "D) NTP servers are unreliable"
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "Which of the following is a potential issue when using NTP synchronization according to page 312?",
+      "type": "mcq",
+      "options": [
+        "A) Network delay limitations",
+        "B) Leap second adjustments",
+        "C) Misconfigured NTP servers",
+        "D) All of the above"
+      ],
+      "correct_option": "D"
+    },
+    {
+      "prompt": "What does ZooKeeper provide that can be used by applications for consensus, failure detection, and membership service according to page 397?",
+      "type": "mcq",
+      "options": [
+        "A) A proven algorithm",
+        "B) An outsourced service",
+        "C) Leaderless replication",
+        "D) Multi-leader replication"
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "In the context of fault tolerance, what is a common challenge when detecting faults in distributed systems as stated on page 333?",
+      "type": "mcq",
+      "options": [
+        "A) Timeouts can't distinguish between network and node failures",
+        "B) Nodes can be in a degraded state",
+        "C) Most systems have accurate mechanisms for failure detection",
+        "D) None of the above"
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "What is an example of a nonlinearizable execution as described on page 356?",
+      "type": "mcq",
+      "options": [
+        "A) A single node update",
+        "B) Consistent quorum reads and writes",
+        "C) Race conditions in concurrent operations",
+        "D) Sequential file writing"
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "Why must transaction commits be irrevocable according to the information given on page 377?",
+      "type": "mcq",
+      "options": [
+        "A) To maintain atomicity guarantees",
+        "B) To prevent data inconsistencies",
+        "C) For read committed isolation",
+        "D) All of the above"
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "What does HDFS stand for as explained in page 420?",
+      "type": "mcq",
+      "options": [
+        "A) Hadoop Distributed File System",
+        "B) High Data File System",
+        "C) Hierarchical Distributed File System",
+        "D) Hyper Distributed File System"
+      ],
+      "correct_option": "A"
+    }
+  ]
+}

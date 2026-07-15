@@ -1,0 +1,94 @@
+{
+  "week": 1,
+  "title": "Data Systems Design",
+  "questions": [
+    {
+      "prompt": "What is the main read pattern for transaction processing systems?",
+      "type": "mcq",
+      "options": [
+        "A) Small number of records per query, fetched by key",
+        "B) Aggregate over large number of records",
+        "C) Random-access, low-latency writes from user input",
+        "D) Bulk import (ETL) or event stream"
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "What is the primary use of OLTP?",
+      "type": "mcq",
+      "options": [
+        "A) End user/customer, via web application",
+        "B) Internal analyst, for decision support",
+        "C) Gigabytes to terabytes",
+        "D) Terabytes to petabytes"
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "Why is it generally a bad idea to use your language’s built-in encoding for anything other than very transient purposes?",
+      "type": "mcq",
+      "options": [
+        "A) Because it's too verbose and complicated",
+        "B) Because it's not widely supported",
+        "C) Because efficiency (CPU time taken to encode or decode, and the size of the encoded structure) is often an afterthought",
+        "D) Because it's not human-readable"
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "What is a problem with RPC frameworks?",
+      "type": "mcq",
+      "options": [
+        "A) They are too explicit about the fact that a remote request is different from a local function call",
+        "B) They don't translate datatypes from one language into another",
+        "C) They can end up ugly when implemented in different programming languages",
+        "D) They don't have any problems"
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "What is the appeal of REST?",
+      "type": "mcq",
+      "options": [
+        "A) It tries to hide the fact that it's a network protocol",
+        "B) It doesn't try to hide the fact that it's a network protocol",
+        "C) It makes remote services look too much like local objects in your programming language",
+        "D) It has no point trying to make a remote service look too much like a local object in your programming language"
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "What is a characteristic of OLAP systems?",
+      "type": "mcq",
+      "options": [
+        "A) They primarily use end users, via web applications",
+        "B) They are used for small number of records per query, fetched by key",
+        "C) They are used for aggregate over large number of records",
+        "D) They are used for random-access, low-latency writes from user input"
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "What is a problem with JSON and XML encodings?",
+      "type": "mcq",
+      "options": [
+        "A) They are too verbose and complicated",
+        "B) They are not widely supported",
+        "C) There is ambiguity around the encoding of numbers",
+        "D) They have no problems"
+      ],
+      "correct_option": "D"
+    },
+    {
+      "prompt": "Why do RPC frameworks use standardized encodings like JSON and XML?",
+      "type": "mcq",
+      "options": [
+        "A) Because they are too powerful",
+        "B) Because they can be used for quick and easy encoding of data",
+        "C) Because they can be written and read by many programming languages",
+        "D) Because they are not widely supported"
+      ],
+      "correct_option": "C"
+    }
+  ]
+}

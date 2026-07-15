@@ -1,0 +1,94 @@
+{
+  "week": 4,
+  "title": "Dataflow Systems",
+  "questions": [
+    {
+      "prompt": "What is the main advantage of using message brokers over direct messaging systems?",
+      "type": "mcq",
+      "options": [
+        "A) They can tolerate more faults.",
+        "B) They require application code to be aware of possibility of message loss.",
+        "C) They provide better performance and fault tolerance.",
+        "D) They are easier to implement."
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "What is the main goal of stream processing?",
+      "type": "mcq",
+      "options": [
+        "A) To write data to a database or cache.",
+        "B) To push events to users.",
+        "C) To process one or more input streams to produce one or more output streams.",
+        "D) To make it impossible to retrieve data."
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "What is the main difference between ESP and CEP?",
+      "type": "mcq",
+      "options": [
+        "A) ESP is a type of event processing, while CEP is not.",
+        "B) ESP stands for Complex Event Processing, while CEP stands for Stream Processing.",
+        "C) ESP is used for batch processing, while CEP is used for real-time processing.",
+        "D) ESP is used for real-time processing, while CEP is used for batch processing."
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "What is the main advantage of using serializable transactions?",
+      "type": "mcq",
+      "options": [
+        "A) They provide better performance and fault tolerance.",
+        "B) They are easier to implement.",
+        "C) They can be run at a small scope where they work well.",
+        "D) They are not required for distributed systems."
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "What is the main concept behind dataflow systems?",
+      "type": "mcq",
+      "options": [
+        "A) That applications should be treated as black boxes.",
+        "B) That data management services can be provided without coordination.",
+        "C) That data loss is easy but deleting data is hard.",
+        "D) That synchronous coordination is required for distributed systems."
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "What is the main advantage of using heterogeneous distributed transactions?",
+      "type": "mcq",
+      "options": [
+        "A) They provide better performance and fault tolerance.",
+        "B) They are easier to implement.",
+        "C) They can be run at a small scope where they work well.",
+        "D) They are not required for distributed systems."
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "What is the main concept behind the tuple spaces model?",
+      "type": "mcq",
+      "options": [
+        "A) That distributed computations can be expressed in terms of processes that observe state changes and react to them.",
+        "B) That data loss is easy but deleting data is hard.",
+        "C) That synchronous coordination is required for distributed systems.",
+        "D) That applications should be treated as black boxes."
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "What is the main advantage of using stream processing and messaging systems?",
+      "type": "mcq",
+      "options": [
+        "A) They provide better performance and fault tolerance.",
+        "B) They are easier to implement.",
+        "C) They can be run at a small scope where they work well.",
+        "D) They are not required for distributed systems."
+      ],
+      "correct_option": "C"
+    }
+  ]
+}

@@ -1,39 +1,38 @@
 ---
 theme: default
 routerMode: hash
-title: Week 2 — Core Concepts
+title: Week 2 — Distributed Systems Consistency
 ---
 
 # Week 2
-## Core Concepts
+## Distributed Systems Consistency
 
 ---
 
-# The vocabulary of the field
+# ACID Properties
 
-- Terms you will meet in every later chapter
-- Why precise definitions matter here
-- How the book introduces each idea
+- Atomicity
+- Consistency
+- Isolation
+- Durability
 
-<small>Source: p.4</small>
-
----
-
-# The first main idea
-
-- Statement of the idea
-- A worked example from the text
-- Where it applies and where it does not
-
-<small>Source: p.5</small>
+<small>Source: p.247</small>
 
 ---
 
-# Common misunderstandings
+# Conflict Resolution and Replication
 
-- The mistake most readers make
-- Why it is tempting
-- How the book corrects it
+- Locks
+- Compare-and-set operations
+- Multi-leader or leaderless replication
 
-<small>Source: p.6</small>
+<small>Source: p.268</small>
 
+---
+
+# Lost Updates and Write Skew
+
+- Phantom reads
+- Weak isolation levels
+
+<small>Source: p.289</small>

@@ -1,31 +1,40 @@
 {
   "lectureId": "week-3",
-  "title": "Applying the Concepts",
+  "title": "Fault Tolerance and Consensus",
   "segments": [
     {
       "slide": 1,
-      "text": "Now we move from theory to practice. There is one step that trips most people up, and we will walk through a small case study that shows it clearly.",
+      "text": "Welcome to our lecture on fault tolerance and consensus. In this lecture, we will discuss how distributed systems can handle failures and achieve consistency across nodes.",
       "citations": [
         {
-          "page": 7
+          "page": 312
         }
       ]
     },
     {
       "slide": 2,
-      "text": "Here is the same idea in a different setting. Notice what stays the same and what has to change. That distinction is the whole point of this chapter.",
+      "text": "As we discussed earlier, network delays can affect NTP synchronization. This means that even with multiple servers, the accuracy of the time can be limited.",
       "citations": [
         {
-          "page": 8
+          "page": 312
         }
       ]
     },
     {
       "slide": 3,
-      "text": "Before you finish, check your work. The book lists the signs that an answer has gone wrong, and recommends a way to verify it.",
+      "text": "In distributed systems, detecting faults and achieving consensus across nodes can be challenging. We need to ensure that the system continues to function even when some nodes fail.",
       "citations": [
         {
-          "page": 9
+          "page": 333
+        }
+      ]
+    },
+    {
+      "slide": 4,
+      "text": "In a distributed system, we want to ensure that operations are executed in a linear order. However, with variable network delays, it's possible for nonlinearizable behavior to occur.",
+      "citations": [
+        {
+          "page": 356
         }
       ]
     }

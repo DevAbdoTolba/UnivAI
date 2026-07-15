@@ -1,0 +1,94 @@
+{
+  "week": 2,
+  "title": "Distributed Systems Consistency",
+  "questions": [
+    {
+      "prompt": "What is the main focus of RPC frameworks?",
+      "type": "mcq",
+      "options": [
+        "A) between services owned by different organizations",
+        "B) within the same datacenter",
+        "C) across organizational boundaries",
+        "D) globally"
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "Which encoding format allows for evolvability according to its compatibility rules?",
+      "type": "mcq",
+      "options": [
+        "A) Thrift",
+        "B) gRPC (Protocol Buffers)",
+        "C) Avro RPC",
+        "D) SOAP"
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "What is the main disadvantage of log replication in PostgreSQL and Oracle?",
+      "type": "mcq",
+      "options": [
+        "A) it does not guarantee consistency",
+        "B) it is closely coupled to the storage engine",
+        "C) it requires manual locking",
+        "D) it is limited by the number of nodes"
+      ],
+      "correct_option": "B"
+    },
+    {
+      "prompt": "What is the quorum condition when w and r are chosen to be a majority of nodes?",
+      "type": "mcq",
+      "options": [
+        "A) w + r > n",
+        "B) w + r < n",
+        "C) w + r = n",
+        "D) w + r ≤ n"
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "What is the problem with partitioning by timestamp in a sensor database?",
+      "type": "mcq",
+      "options": [
+        "A) it leads to hot spots",
+        "B) it causes inconsistencies",
+        "C) it reduces write load",
+        "D) it improves read performance"
+      ],
+      "correct_option": "A"
+    },
+    {
+      "prompt": "Why do distributed datastores use hash functions to determine partitions?",
+      "type": "mcq",
+      "options": [
+        "A) to improve consistency",
+        "B) to reduce write load",
+        "C) to avoid hot spots and skew",
+        "D) to increase read performance"
+      ],
+      "correct_option": "C"
+    },
+    {
+      "prompt": "What is the main difference between atomicity, isolation, and durability in ACID?",
+      "type": "mcq",
+      "options": [
+        "A) atomicity refers to data consistency",
+        "B) isolation refers to concurrency control",
+        "C) durability refers to data persistence",
+        "D) all of the above"
+      ],
+      "correct_option": "D"
+    },
+    {
+      "prompt": "What is the main challenge in implementing serializable transactions in a replicated database?",
+      "type": "mcq",
+      "options": [
+        "A) preventing lost updates",
+        "B) avoiding phantom reads",
+        "C) handling write skew",
+        "D) ensuring consistency"
+      ],
+      "correct_option": "C"
+    }
+  ]
+}

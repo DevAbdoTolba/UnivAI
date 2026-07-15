@@ -1,39 +1,35 @@
 ---
 theme: default
 routerMode: hash
-title: Week 3 — Applying the Concepts
+title: Week 3 — Fault Tolerance and Consensus
 ---
 
 # Week 3
-## Applying the Concepts
+## Fault Tolerance and Consensus
 
 ---
 
-# From theory to practice
+# Network Delays and NTP Synchronization
 
-- The step that trips people up
-- A small case study
-- What to check in your own work
+- Node firewalls may go unnoticed for some time
+- NTP synchronization is limited by network delay
 
-<small>Source: p.7</small>
-
----
-
-# A second example
-
-- Same idea, different setting
-- What stays the same
-- What has to change
-
-<small>Source: p.8</small>
+<small>Source: p.312</small>
 
 ---
 
-# Checking your work
+# Fault Tolerance and Consensus
 
-- Signs your answer is wrong
-- How to verify
-- What the book recommends
+- Detecting faults is hard
+- Timeouts can’t distinguish between network and node failures
 
-<small>Source: p.9</small>
+<small>Source: p.333</small>
 
+---
+
+# Linearizability and Quorums
+
+- Strict quorum reads are linearizable
+- However, nonlinearizable behavior is possible due to clock skew
+
+<small>Source: p.356</small>

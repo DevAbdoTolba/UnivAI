@@ -1,21 +1,42 @@
 {
   "lectureId": "week-1",
-  "title": "Course Introduction",
+  "title": "Data Systems Design",
   "segments": [
     {
       "slide": 1,
-      "text": "Welcome to week one. In this lecture we will look at what this course covers, how the weeks build on each other, and what you should be able to do by the time you sit the midterm.",
-      "citations": [{ "page": 1 }]
+      "text": "Welcome to Data Systems Design. In this course, we will explore the key concepts and techniques for designing reliable, scalable, and maintainable systems.",
+      "citations": [
+        {
+          "page": 1
+        }
+      ]
     },
     {
       "slide": 2,
-      "text": "A lecture works like this. The slides advance on their own while I speak. If something is unclear, unmute your microphone and simply ask. I will stop, answer your question from the book, and then continue exactly where I left off.",
-      "citations": [{ "page": 2 }]
+      "text": "When designing a data system or service, we need to consider several key factors. We want our system to be reliable, scalable, and maintainable.",
+      "citations": [
+        {
+          "page": 1
+        }
+      ]
     },
     {
       "slide": 3,
-      "text": "Your work is assessed in two ways. There is a short quiz at the end of every week, and a midterm that covers weeks one through four. Your attendance is also recorded, including whether you joined on time or late.",
-      "citations": [{ "page": 3 }]
+      "text": "Data models are a crucial part of developing software. They have a profound effect on how we think about the problem that we are solving.",
+      "citations": [
+        {
+          "page": 27
+        }
+      ]
+    },
+    {
+      "slide": 4,
+      "text": "MapReduce is a programming model for distributed execution on a cluster of machines. It can be used to implement higher-level query languages like SQL.",
+      "citations": [
+        {
+          "page": 70
+        }
+      ]
     }
   ]
 }

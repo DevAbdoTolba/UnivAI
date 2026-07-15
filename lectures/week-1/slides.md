@@ -1,38 +1,36 @@
 ---
 theme: default
 routerMode: hash
-title: Week 1 — Course Introduction
+title: Week 1 — Data Systems Design
 ---
 
 # Week 1
-## Course Introduction
+## Data Systems Design
 
 ---
 
-# What this course covers
+# The Big Ideas Behind Reliable, Scalable, and Maintainable Systems
 
-- The scope of the book and how it is organised
-- How each week builds on the last
-- What you are expected to be able to do by the midterm
+- Reliable
+- Scalable
+- Maintainable
 
 <small>Source: p.1</small>
 
 ---
 
-# How a lecture works
+# Data Models and Query Languages
 
-- Slides advance automatically while the lecturer speaks
-- Unmute your microphone at any time to ask a question
-- The lecturer pauses, answers from the book, then carries on
+- Data models
+- Query languages
 
-<small>Source: p.2</small>
+<small>Source: p.27</small>
 
 ---
 
-# Assessment
+# MapReduce and Distributed Query Execution
 
-- A short quiz at the end of every week
-- A midterm covering weeks 1 to 4
-- Attendance is recorded: on time, late, or absent
+- MapReduce
+- Distributed query execution
 
-<small>Source: p.3</small>
+<small>Source: p.70</small>
