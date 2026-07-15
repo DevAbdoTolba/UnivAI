@@ -3,92 +3,124 @@
   "title": "Dataflow Systems",
   "questions": [
     {
-      "prompt": "What is the main advantage of using message brokers over direct messaging systems?",
+      "prompt": "What does a dataflow system do?",
       "type": "mcq",
       "options": [
-        "A) They can tolerate more faults.",
-        "B) They require application code to be aware of possibility of message loss.",
-        "C) They provide better performance and fault tolerance.",
-        "D) They are easier to implement."
+        "A) focus on processing data",
+        "B) manage state changes",
+        "C) provide data management services",
+        "D) require synchronous coordination"
       ],
-      "correct_option": "C"
+      "correct_option": "D",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main goal of stream processing?",
+      "prompt": "How does the application code respond in a dataflow system?",
       "type": "mcq",
       "options": [
-        "A) To write data to a database or cache.",
-        "B) To push events to users.",
-        "C) To process one or more input streams to produce one or more output streams.",
-        "D) To make it impossible to retrieve data."
+        "A) worry about state management",
+        "B) process data",
+        "C) trigger state changes",
+        "D) coordinate with other parts of the system"
       ],
-      "correct_option": "C"
+      "correct_option": "C",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main difference between ESP and CEP?",
+      "prompt": "What is renegotiated in a dataflow system?",
       "type": "mcq",
       "options": [
-        "A) ESP is a type of event processing, while CEP is not.",
-        "B) ESP stands for Complex Event Processing, while CEP stands for Stream Processing.",
-        "C) ESP is used for batch processing, while CEP is used for real-time processing.",
-        "D) ESP is used for real-time processing, while CEP is used for batch processing."
+        "A) data storage mechanisms",
+        "B) state changes",
+        "C) application code and state management",
+        "D) system performance"
       ],
-      "correct_option": "A"
+      "correct_option": "B",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main advantage of using serializable transactions?",
+      "prompt": "What type of coordination do traditional systems need?",
       "type": "mcq",
       "options": [
-        "A) They provide better performance and fault tolerance.",
-        "B) They are easier to implement.",
-        "C) They can be run at a small scope where they work well.",
-        "D) They are not required for distributed systems."
+        "A) asynchronous",
+        "B) synchronous",
+        "C) event-driven",
+        "D) request-response"
       ],
-      "correct_option": "C"
+      "correct_option": "C",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main concept behind dataflow systems?",
+      "prompt": "How does a dataflow system compare to traditional systems?",
       "type": "mcq",
       "options": [
-        "A) That applications should be treated as black boxes.",
-        "B) That data management services can be provided without coordination.",
-        "C) That data loss is easy but deleting data is hard.",
-        "D) That synchronous coordination is required for distributed systems."
+        "A) worse performance and fault tolerance",
+        "B) better performance and fault tolerance",
+        "C) the same performance and fault tolerance",
+        "D) no comparison possible"
       ],
-      "correct_option": "B"
+      "correct_option": "B",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main advantage of using heterogeneous distributed transactions?",
+      "prompt": "What do dataflow systems provide?",
       "type": "mcq",
       "options": [
-        "A) They provide better performance and fault tolerance.",
-        "B) They are easier to implement.",
-        "C) They can be run at a small scope where they work well.",
-        "D) They are not required for distributed systems."
+        "A) strong integrity guarantees only",
+        "B) data management services only",
+        "C) both strong integrity guarantees and data management services",
+        "D) neither strong integrity guarantees nor data management services"
       ],
-      "correct_option": "C"
+      "correct_option": "C",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main concept behind the tuple spaces model?",
+      "prompt": "Can dataflow systems achieve better performance than traditional systems?",
       "type": "mcq",
       "options": [
-        "A) That distributed computations can be expressed in terms of processes that observe state changes and react to them.",
-        "B) That data loss is easy but deleting data is hard.",
-        "C) That synchronous coordination is required for distributed systems.",
-        "D) That applications should be treated as black boxes."
+        "A) no",
+        "B) maybe",
+        "C) yes with certain conditions",
+        "D) always"
       ],
-      "correct_option": "A"
+      "correct_option": "A",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main advantage of using stream processing and messaging systems?",
+      "prompt": "What can dataflow systems provide without requiring coordination?",
       "type": "mcq",
       "options": [
-        "A) They provide better performance and fault tolerance.",
-        "B) They are easier to implement.",
-        "C) They can be run at a small scope where they work well.",
-        "D) They are not required for distributed systems."
+        "A) strong integrity guarantees only",
+        "B) data management services only",
+        "C) both strong integrity guarantees and data management services",
+        "D) neither strong integrity guarantees nor data management services"
       ],
-      "correct_option": "C"
+      "correct_option": "D",
+      "source": "lecture"
+    },
+    {
+      "prompt": "The main advantage of using a message broker over direct messaging systems is that it can handle",
+      "type": "mcq",
+      "options": [
+        "A) limited faults",
+        "B) unbounded data streams",
+        "C) centralized data storage",
+        "D) async retry failures"
+      ],
+      "correct_option": "C",
+      "source": "self_study"
+    },
+    {
+      "prompt": "A serializable transaction in a distributed system can be useful for maintaining",
+      "type": "mcq",
+      "options": [
+        "A) derived state",
+        "B) event logs",
+        "C) search indexes",
+        "D) full-text search"
+      ],
+      "correct_option": "A",
+      "source": "self_study"
     }
   ]
 }

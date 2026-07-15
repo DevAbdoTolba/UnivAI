@@ -268,10 +268,10 @@ def lecture_text(title: str, segments: list[dict]) -> str:
     return f"Lecture: {title}\n\n" + "\n\n".join(seg["text"] for seg in segments)
 
 
-def ask_questions(prompt: str, count: int, source: str) -> list[dict]:
-    # Accept a slightly short reply rather than failing a whole course build —
-    # but never demand MORE than was asked for (the self-study call asks for 2).
-    data = ask_json(prompt, QUIZ_SYSTEM, 1800, check_quiz(max(1, count - 2)))
+def ask_questions(prompt: str, count: int, source: str, minimum: int | None = None) -> list[dict]:
+    # Accept a short reply rather than failing a whole course build — a 3-minute
+    # lecture honestly supports about 5 distinct easy questions, not always 8.
+    data = ask_json(prompt, QUIZ_SYSTEM, 1800, check_quiz(minimum or max(1, count - 2)))
 
     # The exam system's shape: options carry the letter label, correct_option is
     # the letter. `source` says whether the lecturer taught it or it is homework.
@@ -306,6 +306,8 @@ def generate_quiz(
         "The lecture:\n" + lecture_text(title, segments),
         LECTURE_QUESTIONS,
         "lecture",
+        # a full quiz is 5 questions, all lecturer-taught: that is the floor
+        minimum=5,
     )
 
     # 2) The small self-study tail: from the week's wider pages, beyond the slides.

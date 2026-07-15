@@ -3,92 +3,112 @@
   "title": "Distributed Systems Consistency",
   "questions": [
     {
-      "prompt": "What is the main focus of RPC frameworks?",
+      "prompt": "What ensures that once committed, data is permanent in distributed transactions?",
       "type": "mcq",
       "options": [
-        "A) between services owned by different organizations",
-        "B) within the same datacenter",
-        "C) across organizational boundaries",
-        "D) globally"
+        "A) Atomicity",
+        "B) Consistency",
+        "C) Durability",
+        "D) Isolation"
       ],
-      "correct_option": "B"
+      "correct_option": "D",
+      "source": "lecture"
     },
     {
-      "prompt": "Which encoding format allows for evolvability according to its compatibility rules?",
+      "prompt": "Which of the following prevents lost updates in replicated databases?",
       "type": "mcq",
       "options": [
-        "A) Thrift",
-        "B) gRPC (Protocol Buffers)",
-        "C) Avro RPC",
-        "D) SOAP"
+        "A) Locks",
+        "B) Compare-and-set operations",
+        "C) Single up-to-date copy assumption",
+        "D) Multi-leader or leaderless replication"
       ],
-      "correct_option": "A"
+      "correct_option": "A",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main disadvantage of log replication in PostgreSQL and Oracle?",
+      "prompt": "What is a scenario where weak isolation levels are insufficient to handle anomalies?",
       "type": "mcq",
       "options": [
-        "A) it does not guarantee consistency",
-        "B) it is closely coupled to the storage engine",
-        "C) it requires manual locking",
-        "D) it is limited by the number of nodes"
+        "A) Lost updates",
+        "B) Phantom reads",
+        "C) Atomicity issues",
+        "D) Durability failures"
       ],
-      "correct_option": "B"
+      "correct_option": "B",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the quorum condition when w and r are chosen to be a majority of nodes?",
+      "prompt": "Which property ensures that all or nothing is committed in distributed transactions?",
       "type": "mcq",
       "options": [
-        "A) w + r > n",
-        "B) w + r < n",
-        "C) w + r = n",
-        "D) w + r ≤ n"
+        "A) Consistency",
+        "B) Isolation",
+        "C) Atomicity",
+        "D) Durability"
       ],
-      "correct_option": "A"
+      "correct_option": "C",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the problem with partitioning by timestamp in a sensor database?",
+      "prompt": "In which replication model do concurrent writes and asynchronous replication become possible?",
       "type": "mcq",
       "options": [
-        "A) it leads to hot spots",
-        "B) it causes inconsistencies",
-        "C) it reduces write load",
-        "D) it improves read performance"
+        "A) Single-leader",
+        "B) Multi-leader or leaderless",
+        "C) Leader-based",
+        "D) Synchronous"
       ],
-      "correct_option": "A"
+      "correct_option": "B",
+      "source": "lecture"
     },
     {
-      "prompt": "Why do distributed datastores use hash functions to determine partitions?",
+      "prompt": "What is the term for when a transaction overwrites another's write without incorporating its changes?",
       "type": "mcq",
       "options": [
-        "A) to improve consistency",
-        "B) to reduce write load",
-        "C) to avoid hot spots and skew",
-        "D) to increase read performance"
+        "A) Lost updates",
+        "B) Phantom reads",
+        "C) Atomicity failures",
+        "D) Durability issues"
       ],
-      "correct_option": "C"
+      "correct_option": "A",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main difference between atomicity, isolation, and durability in ACID?",
+      "prompt": "Which isolation level does not protect against phantom reads?",
       "type": "mcq",
       "options": [
-        "A) atomicity refers to data consistency",
-        "B) isolation refers to concurrency control",
-        "C) durability refers to data persistence",
-        "D) all of the above"
+        "A) Read committed",
+        "B) Repeatable read",
+        "C) Serializable",
+        "D) Read uncommitted"
       ],
-      "correct_option": "D"
+      "correct_option": "D",
+      "source": "lecture"
     },
     {
-      "prompt": "What is the main challenge in implementing serializable transactions in a replicated database?",
+      "prompt": "What is a method used to prevent lost updates in distributed systems?",
       "type": "mcq",
       "options": [
-        "A) preventing lost updates",
-        "B) avoiding phantom reads",
-        "C) handling write skew",
-        "D) ensuring consistency"
+        "A) Locks",
+        "B) Compare-and-set operations",
+        "C) Single up-to-date copy assumption",
+        "D) Multi-leader or leaderless replication"
       ],
-      "correct_option": "C"
+      "correct_option": "B",
+      "source": "lecture"
+    },
+    {
+      "prompt": "According to the textbook, which of the following is a limitation of quorum consistency when fewer than w or r nodes are available for read or write operations in a distributed system?",
+      "type": "mcq",
+      "options": [
+        "A) A) It guarantees that every read returns the most recent value written.",
+        "B) B) Writes and reads may return an error if not enough nodes are available.",
+        "C) C) The database can automatically prevent lost updates without additional steps.",
+        "D) D) It ensures that all transactions are serializable."
+      ],
+      "correct_option": "B",
+      "source": "self_study"
     }
   ]
 }

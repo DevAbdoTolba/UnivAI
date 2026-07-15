@@ -3,92 +3,124 @@
   "title": "Fault Tolerance and Consensus",
   "questions": [
     {
-      "prompt": "What can cause a node to be falsely suspected of crashing according to page 333?",
+      "prompt": "What can affect NTP synchronization?",
       "type": "mcq",
       "options": [
-        "A) Network congestion",
-        "B) Variable network delay",
-        "C) Driver bug",
-        "D) All of the above"
+        "A) Network Delays",
+        "B) Fault Tolerance",
+        "C) Consensus",
+        "D) Distributed Systems"
       ],
-      "correct_option": "B"
+      "correct_option": "A",
+      "source": "lecture"
     },
     {
-      "prompt": "Why is it challenging for nodes to agree on what time it is in distributed systems as mentioned in page 333?",
+      "prompt": "Why is it challenging to achieve consensus across nodes?",
       "type": "mcq",
       "options": [
-        "A) No shared memory",
-        "B) Lack of global variables",
-        "C) Nodes can't communicate over network",
-        "D) NTP servers are unreliable"
+        "A) Because of network delays",
+        "B) Due to hardware failures",
+        "C) Even with multiple servers",
+        "D) In a centralized system"
       ],
-      "correct_option": "A"
+      "correct_option": "C",
+      "source": "lecture"
     },
     {
-      "prompt": "Which of the following is a potential issue when using NTP synchronization according to page 312?",
+      "prompt": "What do we want to ensure in a distributed system?",
       "type": "mcq",
       "options": [
-        "A) Network delay limitations",
-        "B) Leap second adjustments",
-        "C) Misconfigured NTP servers",
-        "D) All of the above"
+        "A) Nonlinearizable behavior",
+        "B) Linear order operations",
+        "C) Fault tolerance",
+        "D) System consistency"
       ],
-      "correct_option": "D"
+      "correct_option": "B",
+      "source": "lecture"
     },
     {
-      "prompt": "What does ZooKeeper provide that can be used by applications for consensus, failure detection, and membership service according to page 397?",
+      "prompt": "Can multiple servers improve the accuracy of time synchronization?",
       "type": "mcq",
       "options": [
-        "A) A proven algorithm",
-        "B) An outsourced service",
-        "C) Leaderless replication",
-        "D) Multi-leader replication"
+        "A) Yes, always",
+        "B) No, never",
+        "C) It depends on network delays",
+        "D) The answer is unknown"
       ],
-      "correct_option": "B"
+      "correct_option": "A",
+      "source": "lecture"
     },
     {
-      "prompt": "In the context of fault tolerance, what is a common challenge when detecting faults in distributed systems as stated on page 333?",
+      "prompt": "What can happen with variable network delays in a distributed system?",
       "type": "mcq",
       "options": [
-        "A) Timeouts can't distinguish between network and node failures",
-        "B) Nodes can be in a degraded state",
-        "C) Most systems have accurate mechanisms for failure detection",
-        "D) None of the above"
+        "A) Nonlinearizable behavior will not occur",
+        "B) Linearizable behavior will always occur",
+        "C) Nonlinearizable behavior may occur",
+        "D) Consensus will be achieved"
       ],
-      "correct_option": "A"
+      "correct_option": "C",
+      "source": "lecture"
     },
     {
-      "prompt": "What is an example of a nonlinearizable execution as described on page 356?",
+      "prompt": "Why is fault detection and consensus important?",
       "type": "mcq",
       "options": [
-        "A) A single node update",
-        "B) Consistent quorum reads and writes",
-        "C) Race conditions in concurrent operations",
-        "D) Sequential file writing"
+        "A) Because it's fun to do",
+        "B) To ensure system consistency",
+        "C) For the sake of network delays",
+        "D) In a centralized system"
       ],
-      "correct_option": "C"
+      "correct_option": "B",
+      "source": "lecture"
     },
     {
-      "prompt": "Why must transaction commits be irrevocable according to the information given on page 377?",
+      "prompt": "Can distributed systems handle failures?",
       "type": "mcq",
       "options": [
-        "A) To maintain atomicity guarantees",
-        "B) To prevent data inconsistencies",
-        "C) For read committed isolation",
-        "D) All of the above"
+        "A) No, always",
+        "B) Yes, never",
+        "C) It depends on the type of failure",
+        "D) The answer is unknown"
       ],
-      "correct_option": "A"
+      "correct_option": "A",
+      "source": "lecture"
     },
     {
-      "prompt": "What does HDFS stand for as explained in page 420?",
+      "prompt": "What do we need to ensure in a distributed system?",
       "type": "mcq",
       "options": [
-        "A) Hadoop Distributed File System",
-        "B) High Data File System",
-        "C) Hierarchical Distributed File System",
-        "D) Hyper Distributed File System"
+        "A) Nonlinearizable behavior will occur",
+        "B) System consistency is guaranteed",
+        "C) Fault tolerance is not necessary",
+        "D) Consensus is always required"
       ],
-      "correct_option": "A"
+      "correct_option": "B",
+      "source": "lecture"
+    },
+    {
+      "prompt": "If a node is accidentally firewalled off from NTP servers, what may happen to its synchronization accuracy?",
+      "type": "mcq",
+      "options": [
+        "A) A minimum error of 35 ms is achievable",
+        "B) The network delay becomes more accurate",
+        "C) The NTP client gives up entirely",
+        "D) The system crashes"
+      ],
+      "correct_option": "A",
+      "source": "self_study"
+    },
+    {
+      "prompt": "What happens if a transaction has been committed on one node, but not on others?",
+      "type": "mcq",
+      "options": [
+        "A) The nodes become inconsistent with each other",
+        "B) The transaction is automatically retried",
+        "C) The commit record is rolled back",
+        "D) The system crashes"
+      ],
+      "correct_option": "A",
+      "source": "self_study"
     }
   ]
 }
