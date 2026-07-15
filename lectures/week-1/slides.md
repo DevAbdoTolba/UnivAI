@@ -1,5 +1,6 @@
 ---
 theme: default
+routerMode: hash
 title: Week 1 — Course Introduction
 ---
 

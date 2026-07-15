@@ -1,0 +1,1 @@
+in-process auto-reload has been removed from the Python CLI; use `lk agent dev` for hot-reload

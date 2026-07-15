@@ -1,0 +1,24 @@
+2026-07-15 14:22:50,744 - [36mDEBUG[0m asyncio - Using proactor: IocpProactor [90m[0m
+2026-07-15 14:22:50,752 - [36mDEBUG[0m livekit.agents - no system trust store found, setting SSL_CERT_FILE to the certifi bundle [90m[0m
+2026-07-15 14:22:50,754 - [32mINFO[0m livekit.agents - starting worker [90m{"version": "1.6.5", "rtc-version": "1.1.13"}[0m
+2026-07-15 14:22:50,770 - [32mINFO[0m livekit.agents - HTTP server listening on :63770 [90m[0m
+2026-07-15 14:22:52,357 - [32mINFO[0m livekit.agents - registered worker [90m{"agent_name": "", "deployment": "", "id": "AW_t9xM6MVRvm46", "url": "wss://univai-wsyty5fy.livekit.cloud", "region": "Israel", "protocol": 17}[0m
+2026-07-15 14:22:59,251 - [32mINFO[0m livekit.agents - received job request [90m{"job_id": "AJ_MEA5AZwTWkJe", "dispatch_id": "AD_wNzZZT7Pzx4o", "room": "lecture-week-1", "room_id": "RM_CDUa5DTujB6G", "agent_name": "", "resuming": false, "enable_recording": true}[0m
+2026-07-15 14:22:59,371 - [36mDEBUG[0m livekit.agents - received assignment [90m{"agent_name": "", "room_id": "RM_CDUa5DTujB6G", "room": "lecture-week-1", "job_id": "AJ_MEA5AZwTWkJe", "dispatch_id": "AD_wNzZZT7Pzx4o", "enable_recording": true}[0m
+2026-07-15 14:22:59,371 - [33mWARNING[0m livekit.agents - no warmed process available for job, waiting for one to be created [90m{"job_id": "AJ_MEA5AZwTWkJe"}[0m
+2026-07-15 14:22:59,385 - [32mINFO[0m livekit.agents - initializing job runner [90m{"tid": 235656}[0m
+[tts] Kokoro 'af_heart' ready (GPU (NVIDIA GeForce RTX 3060 Laptop GPU))
+2026-07-15 14:23:14,837 - [33mWARNING[0m phonemizer - words count mismatch on 100.0% of the lines (1/1) [90m[0m
+[tts] kokoro: 2.1s of speech in 2.33s (0.9x realtime, gate 4.0s)
+2026-07-15 14:23:19,641 - [33mWARNING[0m phonemizer - words count mismatch on 100.0% of the lines (1/1) [90m[0m
+2026-07-15 14:23:23,340 - [33mWARNING[0m phonemizer - words count mismatch on 100.0% of the lines (1/1) [90m[0m
+[lecture] raise-hand prompts rendered for 'Mohamed Hany'
+[listener] faster-whisper 'base' on GPU (NVIDIA GeForce RTX 3060 Laptop GPU) (float16)
+2026-07-15 14:23:37,323 - [32mINFO[0m livekit.agents - job runner initialized [90m{"tid": 235656, "elapsed_time": 37.94}[0m
+2026-07-15 14:23:37,323 - [36mDEBUG[0m asyncio - Using proactor: IocpProactor [90m[0m
+[lecture] week 1: Course Introduction (3 segments)
+[lecture] hand raised
+2026-07-15 14:23:56,765 - [33mWARNING[0m phonemizer - words count mismatch on 100.0% of the lines (1/1) [90m[0m
+[listener] capturing (threshold 0.006)
+2026-07-15 14:24:12,303 - [32mINFO[0m faster_whisper - Processing audio with duration 00:04.690 [90m[0m
+2026-07-15 14:24:12,360 - [36mDEBUG[0m faster_whisper - Processing segment at 00:00.000 [90m[0m

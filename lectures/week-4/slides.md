@@ -1,5 +1,6 @@
 ---
 theme: default
+routerMode: hash
 title: Week 4 — Review and Synthesis
 ---
 
