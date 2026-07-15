@@ -19,12 +19,8 @@ import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
 import LinearProgress from "@mui/material/LinearProgress";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Step from "@mui/material/Step";
-import StepContent from "@mui/material/StepContent";
 import StepLabel from "@mui/material/StepLabel";
 import Stepper from "@mui/material/Stepper";
 import Typography from "@mui/material/Typography";
@@ -78,13 +74,19 @@ const STATE_COLOR: Record<AgentState, "default" | "primary" | "secondary" | "suc
   ended: "success",
 };
 
-const STEP_LABEL: Record<string, string> = {
-  retrieving: "Searching your book",
-  retrieved: "Passages found",
-  thinking: "Model is writing the answer",
-  answered: "Answer ready",
-  speaking: "Speaking",
-  problem: "Hit a problem — recovering",
+/** The answer pipeline as fixed stepper stages, in the order the worker reports them. */
+const ANSWER_STAGES: { key: string; label: string }[] = [
+  { key: "retrieving", label: "Searching the book" },
+  { key: "retrieved", label: "Passages found" },
+  { key: "thinking", label: "Writing the answer" },
+  { key: "answered", label: "Answer ready" },
+  { key: "speaking", label: "Speaking" },
+];
+
+const JOURNEY_HINT: Record<number, string> = {
+  1: "The lecturer finishes the sentence, then asks you by name.",
+  2: "Your microphone is unlocked — unmute and speak.",
+  3: "Check the transcript below — edit it or send it as is.",
 };
 
 type Props = { lectureId: number };
@@ -361,85 +363,85 @@ export default function LectureRoom({ lectureId }: Props) {
         agentState === "listening" ||
         agentState === "review" ||
         agentState === "asking" ||
-        agentState === "answering") && (
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={1}>
-              <Typography variant="overline" color="text.secondary">
-                Your question
-              </Typography>
-              <Stepper
-                orientation="vertical"
-                activeStep={
-                  agentState === "answering"
-                    ? 4
-                    : agentState === "review" || transcript !== null
-                      ? 3
-                      : hand === "acked" || agentState === "listening"
-                        ? 2
-                        : 1
-                }
-              >
-                <Step>
-                  <StepLabel>Hand raised</StepLabel>
-                </Step>
-                <Step>
-                  <StepLabel>Lecturer calls on you</StepLabel>
-                  <StepContent>
-                    <Typography variant="body2" color="text.secondary">
-                      The lecturer finishes the sentence, then asks you by name.
-                    </Typography>
-                  </StepContent>
-                </Step>
-                <Step>
-                  <StepLabel>Ask your question</StepLabel>
-                  <StepContent>
-                    <Typography variant="body2" color="text.secondary">
-                      Your microphone is unlocked — unmute and speak.
-                    </Typography>
-                  </StepContent>
-                </Step>
-                <Step>
-                  <StepLabel>Confirm what I heard</StepLabel>
-                  <StepContent>
-                    <Typography variant="body2" color="text.secondary">
-                      Check the transcript below — edit it or send it as is.
-                    </Typography>
-                  </StepContent>
-                </Step>
-                <Step>
-                  <StepLabel>Answering</StepLabel>
-                  <StepContent>
+        agentState === "answering") &&
+        (() => {
+          const journeyStep =
+            agentState === "answering"
+              ? 4
+              : agentState === "review" || transcript !== null
+                ? 3
+                : hand === "acked" || agentState === "listening"
+                  ? 2
+                  : 1;
+
+          // Where the answer currently is, mapped onto the fixed pipeline.
+          const reached = steps.filter((step) => step.stage !== "problem");
+          const currentStage = reached[reached.length - 1]?.stage ?? "retrieving";
+          const answerStep = Math.max(
+            0,
+            ANSWER_STAGES.findIndex((stage) => stage.key === currentStage)
+          );
+          const problem = [...steps].reverse().find((step) => step.stage === "problem");
+          const detailFor = (key: string) =>
+            steps.filter((step) => step.stage === key).pop()?.detail || null;
+
+          return (
+            <Card variant="outlined">
+              <CardContent>
+                <Stack spacing={2}>
+                  <Typography variant="overline" color="text.secondary">
+                    Your question
+                  </Typography>
+                  <Stepper activeStep={journeyStep} alternativeLabel>
+                    {[
+                      "Hand raised",
+                      "Lecturer calls on you",
+                      "Ask your question",
+                      "Confirm what I heard",
+                      "Answering",
+                    ].map((label) => (
+                      <Step key={label}>
+                        <StepLabel>{label}</StepLabel>
+                      </Step>
+                    ))}
+                  </Stepper>
+
+                  {journeyStep === 4 ? (
                     <Stack spacing={1}>
-                      <LinearProgress />
-                      <List dense>
-                        {steps.map((step, index) => (
-                          <ListItem key={index}>
-                            <ListItemText
-                              primary={STEP_LABEL[step.stage] ?? step.stage}
-                              secondary={step.detail || null}
-                            />
-                            {index === steps.length - 1 && step.stage !== "problem" ? (
-                              <CircularProgress size={16} />
-                            ) : (
-                              <Chip
-                                size="small"
-                                color={step.stage === "problem" ? "warning" : "success"}
-                                variant="outlined"
-                                label={step.stage === "problem" ? "issue" : "done"}
-                              />
-                            )}
-                          </ListItem>
+                      <Stepper activeStep={answerStep} alternativeLabel>
+                        {ANSWER_STAGES.map((stage, index) => (
+                          <Step key={stage.key} completed={index < answerStep}>
+                            <StepLabel
+                              error={Boolean(problem) && index === answerStep}
+                              optional={
+                                detailFor(stage.key) ? (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {detailFor(stage.key)}
+                                  </Typography>
+                                ) : null
+                              }
+                            >
+                              {stage.label}
+                            </StepLabel>
+                          </Step>
                         ))}
-                      </List>
+                      </Stepper>
+                      {problem ? (
+                        <Alert severity="warning">{problem.detail || "Hit a problem — recovering."}</Alert>
+                      ) : (
+                        <LinearProgress />
+                      )}
                     </Stack>
-                  </StepContent>
-                </Step>
-              </Stepper>
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      {JOURNEY_HINT[journeyStep] ?? ""}
+                    </Typography>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
       {agentState === "ended" && (
         <Card variant="outlined">

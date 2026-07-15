@@ -63,7 +63,7 @@ async def answer_question(question: str, lecture_id: int | None, on_progress=Non
     started = time.perf_counter()
 
     try:
-        await progress("retrieving", "searching the book")
+        await progress("retrieving", "")
         hits = await search_book(question, top_k=5)
         await progress(
             "retrieved",
