@@ -314,26 +314,17 @@ export default function AdminPage() {
                   Regenerate course
                 </Button>
               </Grid>
-              <Grid>
-                <Button
-                  variant="outlined"
-                  disabled={busy || building}
-                  onClick={() => regenerate("quizzes")}
-                >
-                  Regenerate quizzes only
-                </Button>
-              </Grid>
             </Grid>
 
             {building ? (
               <Alert severity="info">
-                Building… follow the progress on the Upload page. Lectures, quizzes and
-                the lecturer&apos;s voice are rewritten; quizzes-only is much faster.
+                Building… follow the progress on the Upload page.
               </Alert>
             ) : (
               <Typography variant="caption" color="text.secondary">
-                A full rebuild rewrites lectures, quizzes, slides and the pre-recorded
-                voice; quizzes-only keeps the lectures and rewrites the question banks.
+                One button on purpose: lectures, slides, quizzes and the pre-recorded
+                voice are rebuilt together, so the quizzes always come from the
+                lectures the students actually get.
               </Typography>
             )}
           </Stack>
