@@ -9,7 +9,9 @@ model that actually served it.
 
 from __future__ import annotations
 
+import asyncio
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -46,18 +48,34 @@ NOT_IN_BOOK = (
 TROUBLE = "I had trouble looking that up. Let me continue, and we can come back to it."
 
 
-async def answer_question(question: str, lecture_id: int | None) -> dict:
-    """Returns {answer, pages, model_used}. Never raises: the lecture must go on."""
+async def answer_question(question: str, lecture_id: int | None, on_progress=None) -> dict:
+    """Returns {answer, pages, model_used}. Never raises: the lecture must go on.
+
+    on_progress(stage: str, detail: str) is awaited at each step so the browser
+    can show WHERE the answer currently is instead of looking frozen."""
+
+    async def progress(stage: str, detail: str = "") -> None:
+        if on_progress:
+            await on_progress(stage, detail)
+
     pages: list[int] = []
     model_used = ""
+    started = time.perf_counter()
 
     try:
+        await progress("retrieving", "searching the book")
         hits = await search_book(question, top_k=5)
+        await progress(
+            "retrieved",
+            f"{len(hits)} passages in {time.perf_counter() - started:.1f}s",
+        )
     except RagUnavailable as exc:
         print(f"[qa] RAG not configured: {exc}")
+        await progress("problem", f"book search unavailable ({exc})")
         hits = []
     except Exception as exc:
         print(f"[qa] RAG failed: {exc}")
+        await progress("problem", "book search failed - apologising and moving on")
         _log(lecture_id, question, TROUBLE, [], "")
         return {"answer": TROUBLE, "pages": [], "model_used": ""}
 
@@ -85,12 +103,19 @@ async def answer_question(question: str, lecture_id: int | None) -> dict:
         "Answer the question using only these passages, in at most three spoken sentences."
     )
 
+    llm_started = time.perf_counter()
     try:
-        result = complete(prompt, system=SYSTEM)
+        import os
+        await progress("thinking", f"asking {os.getenv('LLM_PRIMARY', 'the model')}")
+        # complete() is synchronous urllib; on the event loop it would freeze the
+        # room (no audio, no data messages) for the whole generation.
+        result = await asyncio.to_thread(complete, prompt, SYSTEM)
         answer, model_used = result.text.strip(), result.model_used
+        await progress("answered", f"{model_used} in {time.perf_counter() - llm_started:.1f}s")
     except LLMError as exc:
         # Both primary and fallback are down. Say something graceful and keep lecturing.
         print(f"[qa] all models failed: {exc}")
+        await progress("problem", "both models failed - apologising and moving on")
         answer = TROUBLE
 
     cited = sorted(set(pages))

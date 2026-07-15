@@ -102,6 +102,11 @@ def _call_ollama(model: str, system: str, prompt: str) -> str:
         "system": system,
         "prompt": prompt,
         "stream": False,
+        # Answers are <=3 spoken sentences. Uncapped generation on a busy GPU is
+        # how a question turns into a 12-minute wait; keep_alive (seconds - some
+        # Ollama builds 500 on the string form) stops cold-loading per question.
+        "options": {"num_predict": 180},
+        "keep_alive": 1800,
     }
     data = _post_json(f"{base}/api/generate", payload, {})
     text = data.get("response", "").strip()

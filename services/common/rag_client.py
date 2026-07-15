@@ -27,6 +27,8 @@ import os
 import re
 from pathlib import Path
 
+import asyncio
+
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,9 +64,21 @@ class RagUnavailable(RuntimeError):
     """The RAG service is not configured or not reachable."""
 
 
+RAG_TIMEOUT_S = float(os.getenv("RAG_TIMEOUT_S", "15"))
+
+
 async def _call_tool(tool: str, arguments: dict) -> str:
     if not RAG_MCP_URL:
         raise RagUnavailable("RAG_MCP_URL is not set — point it at the team's RAG MCP server")
+    try:
+        return await asyncio.wait_for(_call_tool_inner(tool, arguments), timeout=RAG_TIMEOUT_S)
+    except asyncio.TimeoutError as exc:
+        # The MCP client reconnect-loops forever against a dead server; the
+        # student would wait minutes. Fail fast and let the lecture continue.
+        raise RagUnavailable(f"RAG did not answer within {RAG_TIMEOUT_S:.0f}s") from exc
+
+
+async def _call_tool_inner(tool: str, arguments: dict) -> str:
 
     # Imported lazily so the app runs before the RAG server is wired up.
     from mcp import ClientSession

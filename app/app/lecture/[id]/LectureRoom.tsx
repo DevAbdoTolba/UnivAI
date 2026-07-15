@@ -19,6 +19,9 @@ import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
 import LinearProgress from "@mui/material/LinearProgress";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import MicIcon from "@mui/icons-material/Mic";
@@ -68,6 +71,15 @@ const STATE_COLOR: Record<AgentState, "default" | "primary" | "secondary" | "suc
   ended: "success",
 };
 
+const STEP_LABEL: Record<string, string> = {
+  retrieving: "Searching your book",
+  retrieved: "Passages found",
+  thinking: "Model is writing the answer",
+  answered: "Answer ready",
+  speaking: "Speaking",
+  problem: "Hit a problem — recovering",
+};
+
 type Props = { lectureId: number };
 
 export default function LectureRoom({ lectureId }: Props) {
@@ -88,6 +100,9 @@ export default function LectureRoom({ lectureId }: Props) {
   // The raise-hand protocol: nobody unmutes unannounced. Raise your hand, the
   // lecturer finishes the sentence and asks you by name, THEN the mic unlocks.
   const [hand, setHand] = useState<"idle" | "raised" | "acked">("idle");
+  // Live trace of where the answer currently is (retrieval -> model -> speech),
+  // so a slow step reads as "working on X for Ns", never as a frozen page.
+  const [steps, setSteps] = useState<{ stage: string; detail: string }[]>([]);
   // Chrome refuses to play audio on a page the user has not interacted with. The
   // lecture page auto-joins, so there is no gesture and the lecturer is silently
   // muted. LiveKit reports this, and room.startAudio() fixes it — but only from
@@ -127,6 +142,7 @@ export default function LectureRoom({ lectureId }: Props) {
             if (message.type === "slide" && typeof message.n === "number") setSlide(message.n);
             if (message.type === "state") {
               setAgentState(message.state as AgentState);
+              if (message.state === "answering") setSteps([]);
               // Reaching the end closes the lecture: it cannot be reopened.
               if (message.state === "ended") {
                 fetch(`/api/lecture/${lectureId}/complete`, { method: "POST" });
@@ -134,6 +150,9 @@ export default function LectureRoom({ lectureId }: Props) {
             }
             if (message.type === "answer") setLastAnswer(message.payload);
             if (message.type === "transcript") setTranscript(message.text ?? null);
+            if (message.type === "progress") {
+              setSteps((previous) => [...previous, { stage: message.stage, detail: message.detail }]);
+            }
             if (message.type === "hand") {
               if (message.state === "acked") setHand("acked");
               if (message.state === "lowered") {
@@ -308,6 +327,70 @@ export default function LectureRoom({ lectureId }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {agentState === "answering" && (
+        <Card variant="outlined">
+          <CardContent>
+            <Stack spacing={1}>
+              <Typography variant="overline" color="text.secondary">
+                Working on your answer
+              </Typography>
+              <LinearProgress />
+              <List dense>
+                {steps.map((step, index) => (
+                  <ListItem key={index}>
+                    <ListItemText
+                      primary={STEP_LABEL[step.stage] ?? step.stage}
+                      secondary={step.detail || null}
+                    />
+                    {index === steps.length - 1 && step.stage !== "problem" ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <Chip
+                        size="small"
+                        color={step.stage === "problem" ? "warning" : "success"}
+                        variant="outlined"
+                        label={step.stage === "problem" ? "issue" : "done"}
+                      />
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {agentState === "ended" && (
+        <Card variant="outlined">
+          <CardContent>
+            <Stack spacing={2}>
+              <Typography variant="h6">Lecture finished 🎓</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Your attendance is recorded. The quiz for this lecture opens as soon as
+                the lecture slot ends — do not miss its 24-hour window.
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid>
+                  <Button variant="contained" href="/exams">
+                    Go to the exam hall
+                  </Button>
+                </Grid>
+                <Grid>
+                  <Button variant="outlined" href="/schedule">
+                    Back to the schedule
+                  </Button>
+                </Grid>
+                <Grid>
+                  <Button variant="outlined" color="secondary" href="/dashboard">
+                    See your dashboard
+                  </Button>
+                </Grid>
+              </Grid>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       <TranscriptReview
         transcript={transcript}

@@ -290,7 +290,11 @@ class LectureSession:
         await self.send({"type": "state", "state": "answering"})
         print(f"[lecture] question: {question}")
 
-        result = await answer_question(question, lecture_id=None)
+        async def on_progress(stage: str, detail: str) -> None:
+            await self.send({"type": "progress", "stage": stage, "detail": detail})
+
+        result = await answer_question(question, lecture_id=None, on_progress=on_progress)
+        await self.send({"type": "progress", "stage": "speaking", "detail": ""})
 
         await self.send(
             {
