@@ -10,3 +10,7 @@
 	path = UnivAI-Agent
 	url = https://github.com/AhmeedFatehy/UnivAI-Agent
 	branch = temp
+[submodule "UnivAI-live"]
+	path = UnivAI-live
+	url = https://github.com/muhameedhanyyy/UnivAI-live
+	branch = research-models
