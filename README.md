@@ -4,11 +4,11 @@
 
 One PDF goes in. Out comes a living four-week semester:
 
-- 🗣️ **Voiced lectures** on a weekly schedule — slides + a lecturer that actually speaks
-- ✋ **Raise your hand** mid-lecture, ask with your voice, get an answer *from the book* with page citations
-- 📝 **Quizzes born from the lectures** — 90% of every paper covers what the lecturer taught, 10% pushes you into the book
-- 🕵️ **A proctored midterm** with cheating reports the admin can read
-- 🕰️ **A virtual clock** — demo a whole month of university in five minutes
+- **Voiced lectures** on a weekly schedule — slides + a lecturer that actually speaks
+- **Raise your hand** mid-lecture, ask with your voice, get an answer *from the book* with page citations
+- **Quizzes born from the lectures** — 90% of every paper covers what the lecturer taught, 10% pushes you into the book
+- **A proctored midterm** with cheating reports the admin can read
+- **A virtual clock** — demo a whole month of university in five minutes
 
 ## Quick start
 

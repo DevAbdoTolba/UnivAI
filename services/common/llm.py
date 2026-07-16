@@ -115,8 +115,8 @@ def _call_bedrock(
 ) -> str:
     """Amazon Bedrock's Converse API with a Bedrock API key (Bearer auth).
 
-    Model IDs look like 'anthropic.claude-haiku-4-5-20251001-v1:0' or
-    'us.meta.llama3-3-70b-instruct-v1:0' — the catalog a sandbox key lists."""
+    Model IDs look like 'us.meta.llama3-3-70b-instruct-v1:0' or
+    'openai.gpt-oss-120b-1:0' — the catalog a sandbox key lists."""
     key = os.getenv("BEDROCK_API_KEY", "") or os.getenv("AWS_BEARER_TOKEN_BEDROCK", "")
     if not key:
         raise LLMError("BEDROCK_API_KEY is not set")

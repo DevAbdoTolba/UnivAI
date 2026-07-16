@@ -13,7 +13,9 @@ COMPOSE  := docker compose -f infra/docker-compose.yml
 PY       := .venv/Scripts/python.exe        # Linux/macOS: .venv/bin/python
 PIP      := .venv/Scripts/pip.exe           # Linux/macOS: .venv/bin/pip
 DB       := docker exec -i univai-db psql -U univai -d univai
-APP_PORT ?= 3000
+# 3100, not 3000: the exam system's "back to UnivAI" buttons point at 3100
+# (UNIVAI_APP_URL in UnivAI-exam_system/.env.local). Keep them in step.
+APP_PORT ?= 3100
 
 .PHONY: help setup env up down schema reset rag app worker exams slides dev status clean
 
@@ -28,15 +30,18 @@ help: ## Show this help
 
 # ---------------------------------------------------------------- setup
 
-setup: env ## Install everything: node deps, python venv, RAG deps
+setup: env ## Install everything: node deps, python venv, exam deps, RAG deps
 	@echo "==> app dependencies"
 	cd app && npm install
 	@echo "==> python venv + voice-agent dependencies"
 	python -m venv .venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -r services/requirements.txt
-	@echo "==> RAG service (UnivAI-Agent submodule)"
+	@echo "==> submodules"
 	git submodule update --init --recursive
+	@echo "==> exam system (UnivAI-exam_system submodule)"
+	cd UnivAI-exam_system && npm install
+	@echo "==> RAG service (UnivAI-Agent submodule)"
 	cd UnivAI-Agent && uv sync
 	@echo ""
 	@echo "Done. Now: make up && make dev"
@@ -46,12 +51,12 @@ env: ## Create .env from .env.example if it does not exist
 
 # ---------------------------------------------------------------- infrastructure
 
-up: ## Start Postgres + Qdrant, then apply the schema
+up: ## Start Postgres + Qdrant + Mongo, then apply the schema
 	$(COMPOSE) up -d
 	@echo "==> waiting for Postgres"
 	@until docker exec univai-db pg_isready -U univai -d univai >/dev/null 2>&1; do sleep 1; done
 	@$(MAKE) --no-print-directory schema
-	@echo "Postgres :5433   Qdrant :6333"
+	@echo "Postgres :5433   Qdrant :6333   Mongo :27017"
 
 down: ## Stop Postgres + Qdrant (data is kept)
 	$(COMPOSE) down
@@ -82,23 +87,29 @@ slides: ## Build the Slidev decks to app/public/slides/
 
 # ---------------------------------------------------------------- everything at once
 
-dev: up ## Start infra, then RAG + app + worker, each in its own terminal
-	@echo "==> launching RAG, app and worker in separate windows"
+dev: up ## Start infra, then RAG + app + worker + exams, each in its own terminal
+	@echo "==> launching RAG, app, worker and exams in separate windows"
 ifeq ($(OS),Windows_NT)
 	@start "UnivAI RAG"    cmd /k "cd UnivAI-Agent && uv run python mcp_server.py"
 	@start "UnivAI app"    cmd /k "cd app && npx next dev -p $(APP_PORT)"
 	@start "UnivAI worker" cmd /k "$(PY) services/voice-agent/worker.py dev"
+	@start "UnivAI exams"  cmd /k "cd UnivAI-exam_system && npm run dev"
 else
-	@($(MAKE) rag &) ; ($(MAKE) app &) ; ($(MAKE) worker &)
+	@($(MAKE) rag &) ; ($(MAKE) app &) ; ($(MAKE) worker &) ; ($(MAKE) exams &)
 endif
 	@echo ""
 	@echo "  app    http://localhost:$(APP_PORT)"
 	@echo "  admin  http://localhost:$(APP_PORT)/admin   (move the virtual clock here)"
+	@echo "  exams  http://localhost:3200"
 	@echo "  RAG    http://localhost:8000/mcp"
+	@echo ""
+	@echo "  Ollama must already be running (ollama list) - the course generator"
+	@echo "  and lecture Q&A call it at :11434."
 
 status: ## Show what is running
 	@echo "containers:" && docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
 	@printf "app    :$(APP_PORT)  " && (curl -s -o /dev/null -m 2 http://localhost:$(APP_PORT)/api/clock && echo "up") || echo "down"
+	@printf "exams  :3200  " && (curl -s -o /dev/null -m 2 http://localhost:3200 && echo "up") || echo "down"
 	@printf "RAG    :8000  " && (curl -s -o /dev/null -m 2 http://localhost:8000/mcp && echo "up") || echo "down"
 	@printf "clock  " && (curl -s -m 2 http://localhost:$(APP_PORT)/api/clock || echo "(app down)") && echo ""
 
