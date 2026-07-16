@@ -1,17 +1,15 @@
-# services/ — the Python side
+# services/ — the campus plumbing (Python)
 
-Each folder is one concern. All of them read the single root `.env` and share
-the plumbing in `common/`.
+The shared bits every cave leans on. The heavy lifting lives in the caves
+themselves: generation in `UnivAI-Agent/generation/` (Brain), the live voice
+class in `UnivAI-live/` (Mouth + ears).
 
-| Folder | What it is | Entry point |
-|---|---|---|
-| `common/` | shared plumbing: virtual clock, Postgres access, LLM adapter (primary → fallback), RAG MCP client, sentence splitting | imported, never run |
-| `course-builder/` | book PDF → the course: `lecture_gen.py` writes slides + narration + quizzes per week, `prerender_audio.py` records the lecturer's voice to disk | spawned by the app; runnable by hand |
-| `voice-agent/` | the live Lecturer: joins the LiveKit room, plays the pre-recorded lecture, listens for raised hands, answers from the book | `python services/voice-agent/worker.py dev` |
-| `rag-tools/` | small CLIs the app shells out to for talking to the team's RAG: `rag_ingest.py` (index a book), `rag_admin.py clear` (wipe before a replacement) | one JSON line out |
+| Folder | What it is |
+|---|---|
+| `common/` | shared plumbing: virtual clock, Postgres access, LLM adapter (primary → fallback), RAG MCP client, sentence splitting. Imported by the caves — never run directly. |
+| `rag-tools/` | small CLIs the app shells out to: `rag_ingest.py` (index a book into the Brain), `rag_admin.py clear` (wipe before a book replacement). One JSON line out. |
 
-`requirements.txt` — everything here runs from the repo's `.venv`
-(`make setup` builds it).
+`requirements.txt` — the repo `.venv` that runs everything Python here and in
+the caves (`make setup` builds it).
 
-Logs land in `logs/` at the repo root — `lecture-gen.log` for course builds,
-`worker-out.log` for the Lecturer.
+Logs land in `logs/` at the repo root.

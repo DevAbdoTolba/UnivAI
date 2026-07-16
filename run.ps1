@@ -73,7 +73,7 @@ function Target-Setup {
     Say "app dependencies"
     Push-Location app; npm install; Pop-Location
 
-    Say "python venv + voice-agent dependencies"
+    Say "python venv + voice (UnivAI-live) dependencies"
     if (-not (Test-Path ".venv")) { python -m venv .venv }
     & $Pip install --upgrade pip
     & $Pip install -r services/requirements.txt
@@ -112,7 +112,7 @@ function Target-Reset {
 
 function Target-Rag    { Push-Location UnivAI-Agent; uv run python mcp_server.py; Pop-Location }
 function Target-App    { Push-Location app; npx next dev -p $AppPort; Pop-Location }
-function Target-Worker { & $Py services/voice-agent/worker.py dev }
+function Target-Worker { & $Py UnivAI-live/worker.py dev }
 function Target-Slides { node scripts/build-slides.mjs }
 function Target-Exams  { Push-Location UnivAI-exam_system; npm run dev; Pop-Location }
 

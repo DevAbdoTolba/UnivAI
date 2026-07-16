@@ -1,7 +1,8 @@
 # lectures/ — the generated course
 
 Everything here is **written by the course builder**
-(`services/course-builder/lecture_gen.py`) from the uploaded book. Don't edit
+(`UnivAI-Agent/generation/lecture_gen.py` — the Brain cave) from the uploaded
+book. Don't edit
 by hand unless you know why; the next "Regenerate course" overwrites it.
 
 ## Anatomy of a week

@@ -80,13 +80,14 @@ The whole UI: `/upload`, `/schedule`, `/lecture/[id]`, `/exams`,
 `/dashboard`, `/admin`. **Port 3100 matters** — the exam system's
 "back to UnivAI" buttons point at it.
 
-### 5. The voice worker — the lecturer itself
+### 5. The voice worker — the lecturer itself (UnivAI-live, the Mouth)
 
 ```bash
-.venv/Scripts/python.exe services/voice-agent/worker.py dev
+.venv/Scripts/python.exe UnivAI-live/worker.py dev
 ```
 
-Registers against LiveKit Cloud (keys from `.env`) and waits. When a student
+Registers against the LiveKit server from `.env` (the local docker one on
+`:7880` by default) and waits. When a student
 opens a lecture it joins the room, plays the pre-recorded voice, and handles
 raise-hand questions. **The first join after a start takes ~25s** (it loads
 Whisper) — the room honestly shows "preparing" until then.
