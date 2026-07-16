@@ -13,4 +13,4 @@
 [submodule "UnivAI-live"]
 	path = UnivAI-live
 	url = https://github.com/muhameedhanyyy/UnivAI-live
-	branch = research-models
+	branch = main
