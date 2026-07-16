@@ -97,7 +97,7 @@ function Target-Up {
     do { Start-Sleep -Milliseconds 700 }
     until (docker exec univai-db pg_isready -U univai -d univai 2>$null)
     Target-Schema
-    Write-Host "Postgres :5433   Qdrant :6333   Mongo :27017" -ForegroundColor Green
+    Write-Host "Postgres :5433   Qdrant :6333   Mongo :27017   LiveKit :7880" -ForegroundColor Green
 }
 
 function Target-Down   { docker @Compose down }
@@ -118,6 +118,10 @@ function Target-Exams  { Push-Location UnivAI-exam_system; npm run dev; Pop-Loca
 
 function Target-Dev {
     Target-Up
+    if (-not (Test-Url "http://127.0.0.1:11434")) {
+        Say "waking Ollama"
+        ollama list | Out-Null
+    }
     Say "launching RAG, app and worker in separate windows"
     $root = $PSScriptRoot
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 rag"
@@ -138,9 +142,11 @@ function Target-Status {
     $appUp   = Test-Url "http://localhost:$AppPort/api/clock"
     $examsUp = Test-Url "http://localhost:3200"
     $ragUp   = Test-Url "http://localhost:8000/mcp"
+    $lkUp    = Test-Url "http://127.0.0.1:7880"
     Write-Host ("app    :{0}  {1}" -f $AppPort, $(if ($appUp) { "up" } else { "down" }))
     Write-Host ("exams  :3200  {0}" -f $(if ($examsUp) { "up" } else { "down" }))
     Write-Host ("RAG    :8000  {0}"  -f $(if ($ragUp) { "up" } else { "down" }))
+    Write-Host ("livekit:7880  {0}"  -f $(if ($lkUp) { "up" } else { "down" }))
 
     if ($appUp) {
         $clock = Invoke-RestMethod "http://localhost:$AppPort/api/clock"

@@ -56,7 +56,7 @@ up: ## Start Postgres + Qdrant + Mongo, then apply the schema
 	@echo "==> waiting for Postgres"
 	@until docker exec univai-db pg_isready -U univai -d univai >/dev/null 2>&1; do sleep 1; done
 	@$(MAKE) --no-print-directory schema
-	@echo "Postgres :5433   Qdrant :6333   Mongo :27017"
+	@echo "Postgres :5433   Qdrant :6333   Mongo :27017   LiveKit :7880"
 
 down: ## Stop Postgres + Qdrant (data is kept)
 	$(COMPOSE) down
@@ -90,10 +90,14 @@ slides: ## Build the Slidev decks to app/public/slides/
 dev: up ## Start infra, then RAG + app + worker + exams, each in its own terminal
 	@echo "==> launching RAG, app, worker and exams in separate windows"
 ifeq ($(OS),Windows_NT)
-	@start "UnivAI RAG"    cmd /k "cd UnivAI-Agent && uv run python mcp_server.py"
-	@start "UnivAI app"    cmd /k "cd app && npx next dev -p $(APP_PORT)"
-	@start "UnivAI worker" cmd /k "$(PY) services/voice-agent/worker.py dev"
-	@start "UnivAI exams"  cmd /k "cd UnivAI-exam_system && npm run dev"
+# On Windows the ollama CLI starts the daemon app when it is not running.
+	@curl -s -m 2 http://127.0.0.1:11434 >/dev/null 2>&1 || (echo "==> waking Ollama" && ollama list >/dev/null 2>&1)
+# Git Bash mangles single-slash cmd switches (/k -> K:/) and its `start`
+# wrapper breaks && chains, so: // switches, /D for the workdir, no &&.
+	@start "UnivAI RAG"    //D UnivAI-Agent cmd //k "uv run python mcp_server.py"
+	@start "UnivAI app"    //D app cmd //k "npx next dev -p $(APP_PORT)"
+	@start "UnivAI worker" cmd //k ".venv\Scripts\python.exe services\voice-agent\worker.py dev"
+	@start "UnivAI exams"  //D UnivAI-exam_system cmd //k "npm run dev"
 else
 	@($(MAKE) rag &) ; ($(MAKE) app &) ; ($(MAKE) worker &) ; ($(MAKE) exams &)
 endif
@@ -103,14 +107,15 @@ endif
 	@echo "  exams  http://localhost:3200"
 	@echo "  RAG    http://localhost:8000/mcp"
 	@echo ""
-	@echo "  Ollama must already be running (ollama list) - the course generator"
-	@echo "  and lecture Q&A call it at :11434."
+	@echo "  Ollama wakes automatically on Windows. The course generator and"
+	@echo "  lecture Q&A call it at :11434 (llama3.2:3b primary, qwen2.5:7b fallback)."
 
 status: ## Show what is running
 	@echo "containers:" && docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
 	@printf "app    :$(APP_PORT)  " && (curl -s -o /dev/null -m 2 http://localhost:$(APP_PORT)/api/clock && echo "up") || echo "down"
 	@printf "exams  :3200  " && (curl -s -o /dev/null -m 2 http://localhost:3200 && echo "up") || echo "down"
 	@printf "RAG    :8000  " && (curl -s -o /dev/null -m 2 http://localhost:8000/mcp && echo "up") || echo "down"
+	@printf "livekit:7880  " && (curl -s -o /dev/null -m 2 http://127.0.0.1:7880 && echo "up") || echo "down"
 	@printf "clock  " && (curl -s -m 2 http://localhost:$(APP_PORT)/api/clock || echo "(app down)") && echo ""
 
 clean: ## Remove containers AND their volumes. Destroys the database and the vectors

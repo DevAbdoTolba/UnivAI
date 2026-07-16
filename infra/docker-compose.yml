@@ -30,6 +30,19 @@ services:
     volumes:
       - univai-qdrant:/qdrant/storage
 
+  # Local LiveKit server so the live lecture never depends on internet weather.
+  # --dev bakes in the devkey/secret pair; --node-ip keeps ICE candidates on
+  # localhost (for a two-machine LAN demo, set it to this machine's LAN IP).
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: univai-livekit
+    restart: unless-stopped
+    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    ports:
+      - "7880:7880"       # signaling (ws / http)
+      - "7881:7881"       # ICE over TCP
+      - "7882:7882/udp"   # media (UDP mux)
+
   # Exam storage for the UnivAI-exam_system submodule (local for now).
   mongo:
     image: mongo:7
