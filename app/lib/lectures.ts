@@ -52,23 +52,44 @@ export async function readScript(week: number): Promise<Script | null> {
   }
 }
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The canonical fresh-semester anchor: tomorrow at 10:00, virtual time. */
+function firstLectureStart(virtualNow: Date): Date {
+  const start = new Date(virtualNow);
+  start.setUTCDate(start.getUTCDate() + 1);
+  start.setUTCHours(10, 0, 0, 0);
+  return start;
+}
+
 /** Seed the 4-week schedule: one lecture a week, starting tomorrow 10:00 virtual time. */
 export async function ensureSchedule(): Promise<void> {
   const existing = await query<{ count: string }>("SELECT COUNT(*)::text AS count FROM lectures");
   if (Number(existing[0]?.count ?? 0) >= WEEKS) return;
 
-  const start = await now();
-  start.setUTCDate(start.getUTCDate() + 1);
-  start.setUTCHours(10, 0, 0, 0);
+  const start = firstLectureStart(await now());
 
   for (let week = 1; week <= WEEKS; week++) {
     const script = await readScript(week);
-    const startsAt = new Date(start.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+    const startsAt = new Date(start.getTime() + (week - 1) * WEEK_MS);
     await query(
       `INSERT INTO lectures (week, title, starts_at, status) VALUES ($1, $2, $3, 'ready')
        ON CONFLICT (week) DO NOTHING`,
       [week, script?.title ?? `Week ${week}`, startsAt]
     );
+  }
+}
+
+/**
+ * Move the whole schedule to a fresh start (same cadence as ensureSchedule:
+ * tomorrow 10:00 virtual time, then weekly). Used by the admin's semester
+ * restart — the lecture rows and their generated content stay.
+ */
+export async function rescheduleLectures(): Promise<void> {
+  const start = firstLectureStart(await now());
+  for (let week = 1; week <= WEEKS; week++) {
+    const startsAt = new Date(start.getTime() + (week - 1) * WEEK_MS);
+    await query("UPDATE lectures SET starts_at = $1 WHERE week = $2", [startsAt, week]);
   }
 }
 

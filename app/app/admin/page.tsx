@@ -69,6 +69,7 @@ type AdminState = {
 export default function AdminPage() {
   const [state, setState] = useState<AdminState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [isoInput, setIsoInput] = useState("");
   const [size, setSize] = useState<CourseSize>("XS");
@@ -126,6 +127,24 @@ export default function AdminPage() {
     }
   }
 
+  async function restartSemester() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/restart", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "restart failed");
+      setError(null);
+      setNotice(
+        "Semester restarted — progress and exam attempts wiped, week 1 starts tomorrow at 10:00 (virtual time)."
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "restart failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function control(body: Record<string, unknown>) {
     setBusy(true);
     try {
@@ -157,6 +176,11 @@ export default function AdminPage() {
       </Alert>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
+      {notice ? (
+        <Alert severity="success" onClose={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      ) : null}
 
       <Card variant="outlined">
         <CardContent>
@@ -229,6 +253,32 @@ export default function AdminPage() {
                   onClick={() => control({ action: "set", iso: isoInput })}
                 >
                   Set
+                </Button>
+              </Grid>
+            </Grid>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="h6">Semester</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Start the course over without touching the generated content: wipes
+              attendance, grades, proctoring reports, the Q&amp;A log and every exam
+              attempt, then reschedules the four lectures to start tomorrow at 10:00
+              (virtual time).
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid>
+                <Button
+                  variant="contained"
+                  color="warning"
+                  disabled={busy || building}
+                  onClick={restartSemester}
+                >
+                  Restart semester
                 </Button>
               </Grid>
             </Grid>
