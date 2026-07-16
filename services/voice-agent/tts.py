@@ -36,6 +36,10 @@ load_dotenv(ROOT / ".env")
 os.environ.setdefault("COQUI_TOS_AGREED", "1")
 
 TTS_ENGINE = os.getenv("TTS_ENGINE", "kokoro").lower()
+# Live speech (spoken answers) has a student staring at a "Speaking…" stepper;
+# it gets its own engine choice. Pre-rendered lecture audio keeps whatever
+# voice TTS_ENGINE produced — this only decides who talks when time is real.
+TTS_LIVE_ENGINE = os.getenv("TTS_LIVE_ENGINE", "").lower()
 LATENCY_GATE_S = float(os.getenv("TTS_LATENCY_GATE_S", "4.0"))
 
 PIPER_MODEL = os.getenv("PIPER_MODEL", "models/piper/en_US-lessac-medium.onnx")
@@ -127,21 +131,38 @@ class CoquiTTS(TTSEngine):
 ENGINES = {"kokoro": KokoroTTS, "piper": PiperTTS, "coqui": CoquiTTS}
 
 
-def load_engine() -> TTSEngine:
-    """Load the configured engine and hold it to the latency gate."""
-    factory = ENGINES.get(TTS_ENGINE, KokoroTTS)
-    engine: TTSEngine = factory()
-
+def _measure(engine: TTSEngine) -> float:
+    """Render one test sentence and report the real speed. Returns elapsed seconds."""
     started = time.perf_counter()
     audio = engine.render("This is a check of the lecturer's voice.")
     elapsed = time.perf_counter() - started
     speech = len(audio) / engine.sample_rate
     ratio = speech / elapsed if elapsed else float("inf")
-
     print(
         f"[tts] {engine.name}: {speech:.1f}s of speech in {elapsed:.2f}s "
         f"({ratio:.1f}x realtime, gate {LATENCY_GATE_S}s)"
     )
+    return elapsed
+
+
+def load_live_engine() -> TTSEngine:
+    """The engine for LIVE speech (answers to questions). Lectures play
+    pre-rendered from disk, so this engine's only job is to never keep a
+    student waiting — TTS_LIVE_ENGINE=piper trades voice richness for 11x
+    realtime while the lecture itself keeps the pre-rendered Kokoro voice."""
+    if TTS_LIVE_ENGINE and TTS_LIVE_ENGINE in ENGINES and TTS_LIVE_ENGINE != TTS_ENGINE:
+        engine: TTSEngine = ENGINES[TTS_LIVE_ENGINE]()
+        _measure(engine)
+        return engine
+    return load_engine()
+
+
+def load_engine() -> TTSEngine:
+    """Load the configured engine and hold it to the latency gate."""
+    factory = ENGINES.get(TTS_ENGINE, KokoroTTS)
+    engine: TTSEngine = factory()
+
+    elapsed = _measure(engine)
 
     if elapsed > LATENCY_GATE_S and engine.name != "piper":
         print(

@@ -18,8 +18,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from common.clock import now  # noqa: E402
 from common.db import execute  # noqa: E402
-from common.llm import complete, LLMError  # noqa: E402
+from common.llm import complete, LLMError, TIMEOUT_QA_S  # noqa: E402
 from common.rag_client import search_book, RagUnavailable  # noqa: E402
+
+# Three short spoken sentences are ~60 tokens. The old uncapped call let the
+# model ramble to its 180-token default — a minute of speech the student then
+# had to wait through TTS for. Cap hard; the prompt already demands brevity.
+ANSWER_MAX_TOKENS = 120
 
 # The RAG service always returns nearest neighbours — even for a question the book
 # does not cover, a vector search still hands back its closest chunks. So an empty
@@ -108,8 +113,11 @@ async def answer_question(question: str, lecture_id: int | None, on_progress=Non
         import os
         await progress("thinking", f"asking {os.getenv('LLM_PRIMARY', 'the model')}")
         # complete() is synchronous urllib; on the event loop it would freeze the
-        # room (no audio, no data messages) for the whole generation.
-        result = await asyncio.to_thread(complete, prompt, SYSTEM)
+        # room (no audio, no data messages) for the whole generation. Keep the
+        # QA timeout even with the cap set (a cap normally means "generation").
+        result = await asyncio.to_thread(
+            complete, prompt, SYSTEM, ANSWER_MAX_TOKENS, None, TIMEOUT_QA_S
+        )
         answer, model_used = result.text.strip(), result.model_used
         await progress("answered", f"{model_used} in {time.perf_counter() - llm_started:.1f}s")
     except LLMError as exc:

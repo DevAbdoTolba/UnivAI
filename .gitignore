@@ -30,6 +30,8 @@ worker-out.log
 worker-err.log
 rag-out.log
 rag-err.log
+rag-ingest-*.log
+rag-ingest-*.err
 lecture-gen*.log
 lecture-gen*.err
 

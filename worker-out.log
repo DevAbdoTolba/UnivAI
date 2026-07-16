@@ -1,5 +1,0 @@
-2026-07-15 14:36:40,942 - [36mDEBUG[0m asyncio - Using proactor: IocpProactor [90m[0m
-2026-07-15 14:36:40,946 - [36mDEBUG[0m livekit.agents - no system trust store found, setting SSL_CERT_FILE to the certifi bundle [90m[0m
-2026-07-15 14:36:40,947 - [32mINFO[0m livekit.agents - starting worker [90m{"version": "1.6.5", "rtc-version": "1.1.13"}[0m
-2026-07-15 14:36:40,960 - [32mINFO[0m livekit.agents - HTTP server listening on :62451 [90m[0m
-2026-07-15 14:36:42,414 - [32mINFO[0m livekit.agents - registered worker [90m{"agent_name": "", "deployment": "", "id": "AW_Ugi4mwuyrTSh", "url": "wss://univai-wsyty5fy.livekit.cloud", "region": "Israel", "protocol": 17}[0m

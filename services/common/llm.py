@@ -87,6 +87,8 @@ def _call_openai(
     key = os.getenv("OPENAI_API_KEY", "")
     if not key:
         raise LLMError("OPENAI_API_KEY is not set")
+    # Any OpenAI-compatible gateway (a course sandbox, a proxy) plugs in here.
+    base = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
     payload = {
         "model": model,
         "messages": [
@@ -97,7 +99,7 @@ def _call_openai(
     if max_tokens:
         payload["max_tokens"] = max_tokens
     data = _post_json(
-        "https://api.openai.com/v1/chat/completions",
+        f"{base}/chat/completions",
         payload,
         {"Authorization": f"Bearer {key}"},
         timeout,
@@ -106,6 +108,41 @@ def _call_openai(
         return data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError) as exc:
         raise LLMError(f"malformed OpenAI response: {str(data)[:300]}") from exc
+
+
+def _call_bedrock(
+    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+) -> str:
+    """Amazon Bedrock's Converse API with a Bedrock API key (Bearer auth).
+
+    Model IDs look like 'anthropic.claude-haiku-4-5-20251001-v1:0' or
+    'us.meta.llama3-3-70b-instruct-v1:0' — the catalog a sandbox key lists."""
+    key = os.getenv("BEDROCK_API_KEY", "") or os.getenv("AWS_BEARER_TOKEN_BEDROCK", "")
+    if not key:
+        raise LLMError("BEDROCK_API_KEY is not set")
+    region = os.getenv("BEDROCK_REGION", "us-east-1")
+    base = os.getenv(
+        "BEDROCK_BASE_URL", f"https://bedrock-runtime.{region}.amazonaws.com"
+    ).rstrip("/")
+    from urllib.parse import quote
+
+    url = f"{base}/model/{quote(model, safe='')}/converse"
+    payload = {
+        "messages": [{"role": "user", "content": [{"text": prompt}]}],
+        "system": [{"text": system}],
+        # Converse has no small default cap; an uncapped spoken answer is a
+        # 12-minute wait wearing a different provider's hat.
+        "inferenceConfig": {"maxTokens": max_tokens or 300},
+    }
+    data = _post_json(url, payload, {"Authorization": f"Bearer {key}"}, timeout)
+    try:
+        parts = data["output"]["message"]["content"]
+        text = "".join(part.get("text", "") for part in parts).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise LLMError(f"malformed Bedrock response: {str(data)[:300]}") from exc
+    if not text:
+        raise LLMError(f"empty Bedrock response: {str(data)[:300]}")
+    return text
 
 
 def _call_ollama(
@@ -141,19 +178,27 @@ def _call_ollama(
     return text
 
 
-def _dispatch(spec: str, system: str, prompt: str, max_tokens: int | None) -> str:
+def _dispatch(
+    spec: str,
+    system: str,
+    prompt: str,
+    max_tokens: int | None,
+    timeout_s: float | None = None,
+) -> str:
     if ":" not in spec:
         raise LLMError(f"bad model spec '{spec}' — expected provider:model")
-    timeout = TIMEOUT_GENERATION_S if max_tokens else TIMEOUT_QA_S
+    timeout = timeout_s or (TIMEOUT_GENERATION_S if max_tokens else TIMEOUT_QA_S)
     provider, model = spec.split(":", 1)
     provider = provider.strip().lower()
     if provider == "gemini":
         return _call_gemini(model, system, prompt, max_tokens, timeout)
     if provider == "openai":
         return _call_openai(model, system, prompt, max_tokens, timeout)
+    if provider == "bedrock":
+        return _call_bedrock(model, system, prompt, max_tokens, timeout)
     if provider == "ollama":
         return _call_ollama(model, system, prompt, max_tokens, timeout)
-    raise LLMError(f"unknown provider '{provider}' (use gemini|openai|ollama)")
+    raise LLMError(f"unknown provider '{provider}' (use gemini|openai|bedrock|ollama)")
 
 
 def complete(
@@ -161,6 +206,7 @@ def complete(
     system: str = "You are a helpful teaching assistant.",
     max_tokens: int | None = None,
     force_spec: str | None = None,
+    timeout_s: float | None = None,
 ) -> LLMResult:
     """Run a completion with primary → fallback failover. Logs which model served it.
 
@@ -177,7 +223,7 @@ def complete(
         attempts = 2 if spec == primary else 1  # primary gets one retry
         for attempt in range(attempts):
             try:
-                text = _dispatch(spec, system, prompt, max_tokens)
+                text = _dispatch(spec, system, prompt, max_tokens, timeout_s)
                 print(f"[llm] served by {spec}", flush=True)
                 return LLMResult(text=text, model_used=spec)
             except LLMError as exc:

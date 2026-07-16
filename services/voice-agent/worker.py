@@ -41,7 +41,7 @@ from livekit import agents, rtc
 from common.device import whisper_settings, describe  # noqa: E402
 from common.sentences import split_sentences  # noqa: E402
 from qa import answer_question  # noqa: E402
-from tts import load_engine  # noqa: E402
+from tts import load_live_engine  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -374,14 +374,22 @@ class LectureSession:
         # the NEXT sentence while the current one plays — the silent render gap
         # between sentences was why "Speaking" felt like it never finished.
         sentences = split_sentences(result["answer"])
+        total = len(sentences)
         upcoming: asyncio.Task[np.ndarray] | None = (
             asyncio.create_task(self.render(sentences[0])) if sentences else None
         )
-        for index in range(len(sentences)):
+        for index in range(total):
+            await self.send(
+                {
+                    "type": "progress",
+                    "stage": "speaking",
+                    "detail": f"sentence {index + 1} of {total}",
+                }
+            )
             audio = await upcoming if upcoming else await self.render(sentences[index])
             upcoming = (
                 asyncio.create_task(self.render(sentences[index + 1]))
-                if index + 1 < len(sentences)
+                if index + 1 < total
                 else None
             )
             await self.play(audio, interruptible=False)
@@ -469,7 +477,7 @@ def prewarm(proc: agents.JobProcess) -> None:
     Every piece here is allowed to fail: lectures play from disk, prompts come
     pre-rendered from disk, and a missing engine only degrades live answers."""
     try:
-        engine = load_engine()
+        engine = load_live_engine()
     except Exception as exc:
         print(f"[tts] engine failed to load ({exc}) - lecture audio comes from disk")
         engine = None
