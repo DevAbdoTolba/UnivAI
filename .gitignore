@@ -22,18 +22,12 @@ uploads/
 # regenerable from script.json in minutes
 lectures/*/audio/
 lectures/_prompts/
-prerender.log
-prerender.err
 
-# service logs
-worker-out.log
-worker-err.log
-rag-out.log
-rag-err.log
-rag-ingest-*.log
-rag-ingest-*.err
-lecture-gen*.log
-lecture-gen*.err
+# all service + build logs live here (see docs/running.md)
+logs/
+# log strays at the repo root
+/*.log
+/*.err
 
 # models / caches
 models/

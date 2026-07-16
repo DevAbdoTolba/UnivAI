@@ -11,7 +11,9 @@ param(
     [Parameter(Position = 0)]
     [string]$Target = "help",
 
-    [int]$AppPort = 3000
+    # 3100, not 3000: the exam system's "back to UnivAI" buttons point at 3100
+    # (UNIVAI_APP_URL in UnivAI-exam_system/.env.local). Keep them in step.
+    [int]$AppPort = 3100
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,8 +78,13 @@ function Target-Setup {
     & $Pip install --upgrade pip
     & $Pip install -r services/requirements.txt
 
-    Say "RAG service (UnivAI-Agent submodule)"
+    Say "submodules"
     git submodule update --init --recursive
+
+    Say "exam system (UnivAI-exam_system submodule)"
+    Push-Location UnivAI-exam_system; npm install; Pop-Location
+
+    Say "RAG service (UnivAI-Agent submodule)"
     Push-Location UnivAI-Agent; uv sync; Pop-Location
 
     Write-Host ""
@@ -90,7 +97,7 @@ function Target-Up {
     do { Start-Sleep -Milliseconds 700 }
     until (docker exec univai-db pg_isready -U univai -d univai 2>$null)
     Target-Schema
-    Write-Host "Postgres :5433   Qdrant :6333" -ForegroundColor Green
+    Write-Host "Postgres :5433   Qdrant :6333   Mongo :27017" -ForegroundColor Green
 }
 
 function Target-Down   { docker @Compose down }
@@ -128,9 +135,11 @@ function Target-Status {
     Write-Host "containers:"
     docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
 
-    $appUp = Test-Url "http://localhost:$AppPort/api/clock"
-    $ragUp = Test-Url "http://localhost:8000/mcp"
+    $appUp   = Test-Url "http://localhost:$AppPort/api/clock"
+    $examsUp = Test-Url "http://localhost:3200"
+    $ragUp   = Test-Url "http://localhost:8000/mcp"
     Write-Host ("app    :{0}  {1}" -f $AppPort, $(if ($appUp) { "up" } else { "down" }))
+    Write-Host ("exams  :3200  {0}" -f $(if ($examsUp) { "up" } else { "down" }))
     Write-Host ("RAG    :8000  {0}"  -f $(if ($ragUp) { "up" } else { "down" }))
 
     if ($appUp) {

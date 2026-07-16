@@ -1,115 +1,55 @@
-# UnivAI — MVP-1 ("One Book, One Month")
+# UnivAI — "Jamieh" 🎓
 
-Upload one textbook, get a four-week semester: weekly slide-and-voice lectures you
-can interrupt to ask questions, attendance tracking, and a dashboard.
+**Upload a textbook. Get a university.**
 
-**This repo does not implement RAG.** The team's RAG service already exists and lives
-elsewhere; here it is only *consumed* (see [RAG integration](#rag-integration)).
+One PDF goes in. Out comes a living four-week semester:
 
-## Layout
+- 🗣️ **Voiced lectures** on a weekly schedule — slides + a lecturer that actually speaks
+- ✋ **Raise your hand** mid-lecture, ask with your voice, get an answer *from the book* with page citations
+- 📝 **Quizzes born from the lectures** — 90% of every paper covers what the lecturer taught, 10% pushes you into the book
+- 🕵️ **A proctored midterm** with cheating reports the admin can read
+- 🕰️ **A virtual clock** — demo a whole month of university in five minutes
 
-```
-app/                     Next.js 16 (App Router, TypeScript) — all UI + API routes.
-                         Frontend is pure MUI: no sx, no styled(), no CSS files.
-services/
-  common/                shared clock, db, LLM adapter (primary + fallback), RAG client
-  voice-agent/           the live lecture: Lecturer (TTS) + Listener (STT) agents
-infra/                   docker-compose (Postgres) + schema.sql
-lectures/week-N/         PREMADE content: slides.md (Slidev) + script.json (narration)
-scripts/build-slides.mjs builds the decks to app/public/slides/week-N/
-```
-
-## Run it
+## Quick start
 
 ```bash
-make setup     # node deps, python venv, RAG deps, .env
-make up        # Postgres + Qdrant, schema applied
-make dev       # RAG server + app + voice worker, each in its own terminal
+make setup   # one time: installs everything
+make up      # Postgres + Qdrant + Mongo containers
+make dev     # RAG + app + exams + voice worker, each in its own window
 ```
 
-Windows has no `make`. Use the PowerShell twin — same target names:
+Then open **http://localhost:3100** → upload a book on `/upload` → drive time from `/admin`.
 
-```powershell
-./run.ps1 setup ; ./run.ps1 up ; ./run.ps1 dev
+No `make` on Windows? Same targets: `./run.ps1 setup ; ./run.ps1 up ; ./run.ps1 dev`
+
+## How it flows
+
+```
+book.pdf ──▶ RAG (index it) ──▶ course generator (LLM) ──▶ 4 weeks of
+             slides + narration + quizzes ──▶ pre-recorded lecturer voice
+             ──▶ live LiveKit lecture room ──▶ exam system ──▶ grades +
+             proctoring reports, back on your dashboard
 ```
 
-| Target | Does |
+## Read more
+
+| Doc | What's inside |
 |---|---|
-| `setup` | Install app deps, create the venv, `uv sync` the RAG submodule, create `.env` |
-| `up` / `down` | Start / stop Postgres + Qdrant (`up` also applies the schema) |
-| `dev` | Everything: infra, then RAG (`:8000`), app (`:3000`), voice worker |
-| `rag` / `app` / `worker` | Run just one of the three, in the foreground |
-| `slides` | Build the Slidev decks into `app/public/slides/` |
-| `reset` | Wipe lectures, attendance, grades and questions; reset the virtual clock |
-| `status` | What is up, and what the virtual clock currently reads |
-| `clean` | Remove the containers **and their volumes** — destroys the DB and the vectors |
+| [docs/running.md](docs/running.md) | **How to run it** — every service by hand, step by step, then the one-command way |
+| [docs/architecture.md](docs/architecture.md) | The moving parts, their ports, and how data flows between them |
+| [docs/admin.md](docs/admin.md) | The SUDO panel: virtual clock, course-size dial, restart semester |
 
-Postgres is published on **5433**, not 5432, because 5432 is commonly already taken.
+## Repo layout
 
-## Configuration (`.env`)
+```
+app/                  Next.js 16 — all UI + API routes (pure MUI)
+services/             Python: course generator, voice worker, shared clock/db/LLM
+lectures/week-N/      GENERATED from your book: slides.md, script.json, quiz.json
+UnivAI-Agent/         the team's RAG service (submodule) — consumed, never modified
+UnivAI-exam_system/   the team's exam platform (submodule), port 3200
+infra/                docker-compose (Postgres, Qdrant, Mongo) + schema.sql
+logs/                 every service and build log lands here
+```
 
-| Variable | What it does |
-|---|---|
-| `LLM_PRIMARY`, `LLM_FALLBACK` | `provider:model` — `gemini:…`, `openai:…` or `ollama:…`. Any error on the primary (auth, 429, 5xx, timeout, bad response) retries once, then switches to the fallback. Every call logs which model served it. |
-| `GEMINI_API_KEY` / `OPENAI_API_KEY` / `OLLAMA_BASE_URL` | credentials for whichever providers you name above |
-| `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `NEXT_PUBLIC_LIVEKIT_URL` | LiveKit Cloud (free tier) |
-| `RAG_INGEST_URL` | where `/upload` forwards the book for indexing |
-| `RAG_MCP_COMMAND` | the RAG MCP server the live Q&A calls, e.g. `python ../their-rag/server.py` |
-| `TTS_ENGINE`, `STT_MODEL_SIZE` | `coqui` (XTTS-v2) or `piper`; whisper model size |
-| `DATABASE_URL` | Postgres |
-
-## The pages
-
-| Route | What it does |
-|---|---|
-| `/upload` | Upload the one book (PDF). Validates it, then hands it to the RAG service. |
-| `/schedule` | The four lectures. Click one for details and your attendance for it. |
-| `/lecture/[id]` | The live lecture: LiveKit room, Slidev slides, **mute button**, agent status. |
-| `/dashboard` | Attendance (on time / late + minutes / absent) and grades. |
-| `/admin` | **SUDO, no auth.** Move the virtual clock, and see every row of your data. |
-
-## The live lecture
-
-One worker process joins the room as two agents:
-
-- **Lecturer** — speaks the premade `script.json` through local streaming TTS and sends
-  slide-sync messages that flip the Slidev iframe.
-- **Listener** — subscribes to the student's mic, runs VAD, and on ≥300 ms of speech
-  **interrupts the Lecturer mid-sentence**.
-
-Then: the question is transcribed (faster-whisper) → retrieved from the book (the team's
-RAG, over MCP) → answered by the small LLM in ≤3 sentences **with page citations** →
-spoken back → the lecture resumes from the interrupted sentence.
-
-If RAG returns nothing, the agent says the book does not cover it. It never invents an
-answer. Every question, answer, citation and the model used lands in `qa_log`.
-
-**Mute** stops the mic publishing entirely, so VAD cannot fire and the lecture is never
-interrupted.
-
-**TTS latency gate:** XTTS-v2 on CPU can be too slow for real time. The worker measures
-time-to-first-audio at startup; if it exceeds `TTS_LATENCY_GATE_S` (default 2s) it reports
-the measurement and falls back to Piper. It never swaps silently.
-
-## The virtual clock (why attendance is demoable)
-
-Nothing in this codebase reads the wall clock except one function in `app/lib/clock.ts`
-and one in `services/common/clock.py`. Everything else — lecture state, attendance
-stamping, "absent" — asks the ClockService, which is wall clock + an offset stored in
-Postgres.
-
-So `/admin` can jump the world forward: land 7 minutes after a lecture starts and join,
-and the dashboard records **late, 7 min** (grace window is 5 minutes). Skip a lecture and
-jump a week; it becomes **absent**.
-
-## RAG integration
-
-Set `RAG_INGEST_URL` (upload path) and `RAG_MCP_COMMAND` (Q&A path) in `.env`. If the
-tool names on the RAG side are not `search_book` / `get_pages`, change `RAG_TOOL_SEARCH`
-and `RAG_TOOL_PAGES` — that is the only place this repo cares.
-
-## Not in MVP-1
-
-Attendance **enforcement** (penalties, dismissal, certificates), the TA chatbot, the CV
-track, labs and sections, and quiz/exam *generation* — grades are stubbed until the
-`UnivAI-exam_system` submodule is wired in (`TODO(exam-system)` marks the seam).
+> **This repo does not implement RAG.** The team's RAG service lives in the
+> `UnivAI-Agent` submodule and is only *called* from here, over MCP.
