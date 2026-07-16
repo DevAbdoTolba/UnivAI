@@ -29,6 +29,7 @@ import json
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -52,6 +53,13 @@ STT_MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "base")
 SPEECH_TRIGGER_MS = 300     # this much speech from the student = a barge-in
 SILENCE_END_MS = 800        # this much silence = they have finished asking
 REVIEW_TIMEOUT_S = 120      # how long we hold the lecture while they edit the transcript
+
+
+def log(message: str) -> None:
+    """print() with a wall-clock stamp: 'the speak took 4:35' is un-debuggable
+    from prints that do not say WHEN. (Infra logging only — business logic
+    still goes through the virtual clock.)"""
+    print(f"[{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
 
 # ---------------------------------------------------------------- lecture script
@@ -337,7 +345,7 @@ class LectureSession:
         # they send it, edit it first, or throw it away.
         await self.send({"type": "state", "state": "review"})
         await self.send({"type": "transcript", "text": heard})
-        print(f"[lecture] heard: {heard!r} - waiting for the student to confirm")
+        log(f"[lecture] heard: {heard!r} - waiting for the student to confirm")
 
         try:
             question = await asyncio.wait_for(self.confirmed.get(), timeout=REVIEW_TIMEOUT_S)
@@ -350,10 +358,16 @@ class LectureSession:
             print("[lecture] question cancelled")
             return False
 
+        # The question is in — the capture window's job is done. Closing it now
+        # keeps the student's still-open mic (or its echo of OUR answer) from
+        # feeding Whisper while the lecturer talks.
+        self.hand_active = False
+
         await self.send({"type": "state", "state": "answering"})
-        print(f"[lecture] question: {question}")
+        log(f"[lecture] question: {question}")
 
         async def on_progress(stage: str, detail: str) -> None:
+            log(f"[qa] {stage}: {detail}" if detail else f"[qa] {stage}")
             await self.send({"type": "progress", "stage": stage, "detail": detail})
 
         result = await answer_question(question, lecture_id=None, on_progress=on_progress)
@@ -375,6 +389,7 @@ class LectureSession:
         # between sentences was why "Speaking" felt like it never finished.
         sentences = split_sentences(result["answer"])
         total = len(sentences)
+        log(f"[speak] answer has {total} sentences, {len(result['answer'])} chars")
         upcoming: asyncio.Task[np.ndarray] | None = (
             asyncio.create_task(self.render(sentences[0])) if sentences else None
         )
@@ -386,13 +401,22 @@ class LectureSession:
                     "detail": f"sentence {index + 1} of {total}",
                 }
             )
+            waited = time.perf_counter()
             audio = await upcoming if upcoming else await self.render(sentences[index])
+            waited = time.perf_counter() - waited
             upcoming = (
                 asyncio.create_task(self.render(sentences[index + 1]))
                 if index + 1 < total
                 else None
             )
+            played = time.perf_counter()
             await self.play(audio, interruptible=False)
+            played = time.perf_counter() - played
+            speech = len(audio) / self.sample_rate
+            log(
+                f"[speak] sentence {index + 1}/{total}: waited {waited:.2f}s on TTS, "
+                f"{speech:.1f}s of speech played in {played:.2f}s"
+            )
         return True
 
 
@@ -437,8 +461,10 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) ->
             silence_ms += frame_ms
 
         # Only the raise-hand window records anything: outside it the student is
-        # muted anyway, and stray noise must never derail the lecture.
-        if not session.hand_active:
+        # muted anyway, and stray noise must never derail the lecture. The same
+        # gate holds while the LECTURER is speaking — an open mic next to
+        # speakers would otherwise feed our own voice back into Whisper.
+        if not session.hand_active or session.speaking:
             preroll.append(samples)
             buffer, capturing, speech_ms = [], False, 0
             continue
@@ -463,7 +489,12 @@ async def listen(session: LectureSession, track: rtc.RemoteAudioTrack, model) ->
                     segments, _info = model.transcribe(samples, language="en")
                     return " ".join(seg.text.strip() for seg in segments).strip()
 
+                stt_started = time.perf_counter()
                 text = await asyncio.to_thread(run_stt, audio)
+                log(
+                    f"[listener] STT of {len(audio) / 16000:.1f}s audio took "
+                    f"{time.perf_counter() - stt_started:.2f}s"
+                )
                 if text:
                     await session.heard.put(text)
 
@@ -554,7 +585,7 @@ async def entrypoint(ctx: agents.JobContext) -> None:
         elif message.get("type") == "cancel":
             session.confirmed.put_nowait("")
         elif message.get("type") == "raise_hand":
-            print("[lecture] hand raised")
+            log("[lecture] hand raised")
             session.hand_raised.set()
         elif message.get("type") == "mic":
             if message.get("muted"):

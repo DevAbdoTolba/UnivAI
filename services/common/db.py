@@ -19,7 +19,11 @@ DATABASE_URL = os.getenv(
 
 
 def connect() -> psycopg.Connection:
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row, autocommit=True)
+    # libpq's default connect timeout is INFINITE. Under load this Postgres
+    # (Docker, :5433) answers slowly; a caller must never hang on it forever.
+    return psycopg.connect(
+        DATABASE_URL, row_factory=dict_row, autocommit=True, connect_timeout=5
+    )
 
 
 def fetch_all(sql: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:
