@@ -8,7 +8,7 @@ Six processes, three containers, one virtual clock.
 |---|---|---|---|
 | **app** (Next.js 16) | `app/` | **3100** | every page + API route; owns Postgres |
 | **voice worker** | `services/voice-agent/` | — | the Lecturer: joins LiveKit rooms, plays the pre-recorded voice, answers raised hands |
-| **course generator** | `services/lecture_gen.py` | — | book PDF → 4 weeks of slides + narration + quizzes (spawned by the app, watch `logs/lecture-gen.log`) |
+| **course generator** | `services/course-builder/` | — | book PDF → 4 weeks of slides + narration + quizzes (spawned by the app, watch `logs/lecture-gen.log`) |
 | **RAG server** (team's, submodule) | `UnivAI-Agent/` | 8000 | indexes the book, answers retrieval queries over MCP |
 | **exam system** (team's, submodule) | `UnivAI-exam_system/` | 3200 | runs quizzes + midterm with proctoring, webhooks results back |
 | Postgres | container `univai-db` | 5433 | books, lectures, attendance, grades, qa_log, **clock_state** |

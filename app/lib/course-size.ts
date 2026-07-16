@@ -1,7 +1,7 @@
 /**
  * The course size dial. One setting scales the lecture (slides, spoken length)
  * and the assessments (quiz/mid paper sizes). The Python generator holds the
- * SAME table (services/lecture_gen.py SIZES) — keep them in sync.
+ * SAME table (services/course-builder/lecture_gen.py SIZES) — keep them in sync.
  *
  * XS is the fast demo profile the project started with; M is a normal lecture.
  */

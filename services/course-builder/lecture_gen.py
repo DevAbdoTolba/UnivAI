@@ -1,6 +1,6 @@
 """Turn the uploaded book into the 4-week course: slides, narration, quizzes.
 
-    python services/lecture_gen.py <absolute_pdf_path> <book_id>
+    python services/course-builder/lecture_gen.py <absolute_pdf_path> <book_id>
 
 For each week this writes, under lectures/week-N/:
     slides.md    Slidev deck — title slide + 3 content slides, built from the book
@@ -28,12 +28,12 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # services/, for common.*
 
 from common.db import execute, fetch_one  # noqa: E402
 from common.llm import complete, LLMError  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 LECTURES_DIR = ROOT / "lectures"
 WEEKS = 4
 
@@ -410,10 +410,10 @@ def build_slides() -> None:
 
 
 def prerender_voice() -> None:
-    """Record the whole lecture to disk (services/prerender_audio.py) in a
-    subprocess, so the TTS model's memory is returned the moment it is done."""
+    """Record the whole lecture to disk (prerender_audio.py, next to this file)
+    in a subprocess, so the TTS model's memory is returned the moment it is done."""
     result = subprocess.run(
-        [sys.executable, str(ROOT / "services" / "prerender_audio.py")],
+        [sys.executable, str(Path(__file__).resolve().parent / "prerender_audio.py")],
         cwd=ROOT,
         capture_output=True,
         text=True,

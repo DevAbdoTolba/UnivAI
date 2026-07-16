@@ -4,15 +4,15 @@ import path from "path";
 import { REPO_ROOT, VENV_PYTHON } from "./python";
 
 /**
- * Fire course generation (services/lecture_gen.py) detached, so it outlives
- * the HTTP request that asked for it. Progress is reported through
+ * Fire course generation (services/course-builder/lecture_gen.py) detached, so
+ * it outlives the HTTP request that asked for it. Progress is reported through
  * books.progress; output lands in logs/lecture-gen.log.
  */
 export function spawnGeneration(pdfPath: string, bookId: number, quizzesOnly = false): void {
   mkdirSync(path.join(REPO_ROOT, "logs"), { recursive: true });
   const log = openSync(path.join(REPO_ROOT, "logs", "lecture-gen.log"), "a");
   const args = [
-    path.join(REPO_ROOT, "services", "lecture_gen.py"),
+    path.join(REPO_ROOT, "services", "course-builder", "lecture_gen.py"),
     pdfPath,
     String(bookId),
   ];

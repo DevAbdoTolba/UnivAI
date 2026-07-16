@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   // keep answering from it. A clear that fails aborts the upload — loudly.
   const existing = await queryOne<{ count: string }>("SELECT COUNT(*)::text AS count FROM books");
   if (Number(existing?.count ?? 0) > 0) {
-    const cleared = await runPython("services/rag_admin.py", ["clear"]);
+    const cleared = await runPython("services/rag-tools/rag_admin.py", ["clear"]);
     const clearedPayload = parseJsonLine<{ ok: boolean; removed?: number; error?: string }>(
       cleared.stdout
     );
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
   // A full textbook takes the RAG service a while to chunk and embed on this
   // machine — a 600-page book measured ~29 minutes. The MCP client must stay
   // connected the whole time: their server aborts the ingest on disconnect.
-  const result = await runPython("services/rag_ingest.py", [destination], 60 * 60_000);
+  const result = await runPython("services/rag-tools/rag_ingest.py", [destination], 60 * 60_000);
   const payload = parseJsonLine<{ ok: boolean; message?: string; error?: string }>(result.stdout);
 
   if (!payload?.ok) {

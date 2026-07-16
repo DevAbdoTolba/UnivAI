@@ -1,6 +1,6 @@
 """Clear the user's knowledge base in the team's RAG service.
 
-    python services/rag_admin.py clear
+    python services/rag-tools/rag_admin.py clear
 
 Used when the book is replaced: the old book's chunks must go, or the lecturer
 would keep answering questions from a book the course no longer teaches.
@@ -14,7 +14,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # services/, for common.*
 
 from common.rag_client import _call_tool, RAG_USER_ID, RagUnavailable  # noqa: E402
 

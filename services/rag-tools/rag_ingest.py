@@ -3,7 +3,7 @@
 The Next.js /upload route spawns this. The RAG service ingests by absolute file
 path over MCP (ingest_file), so there is no HTTP upload endpoint to POST to.
 
-    python services/rag_ingest.py "D:/path/to/book.pdf"
+    python services/rag-tools/rag_ingest.py "D:/path/to/book.pdf"
 
 Prints one line of JSON: {"ok": true, "message": "..."} or {"ok": false, "error": "..."}
 """
@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # services/, for common.*
 
 from common.rag_client import ingest_file, RagUnavailable  # noqa: E402
 

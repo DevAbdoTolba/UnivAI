@@ -1,6 +1,6 @@
 """Pre-render the lecturer's voice to disk, so lectures never wait on TTS.
 
-    python services/prerender_audio.py
+    python services/course-builder/prerender_audio.py
 
 For every week this renders each sentence of script.json to
 lectures/week-N/audio/s{segment}-t{sentence}.npy (float32 PCM) plus a
@@ -25,12 +25,12 @@ import numpy as np
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent / "voice-agent"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))                  # services/, for common.*
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "voice-agent"))  # for tts
 
 from common.sentences import split_sentences  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 LECTURES_DIR = ROOT / "lectures"
 PROMPTS_DIR = LECTURES_DIR / "_prompts"
 

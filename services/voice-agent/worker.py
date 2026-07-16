@@ -47,6 +47,12 @@ from tts import load_live_engine  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
 
+# "localhost" resolves to ::1 first on Windows, and the Rust rtc client times
+# out on a dropped ::1 before falling back to IPv4 — dial v4 loopback directly.
+_url = os.getenv("LIVEKIT_URL", "")
+if "://localhost" in _url:
+    os.environ["LIVEKIT_URL"] = _url.replace("://localhost", "://127.0.0.1")
+
 LECTURES_DIR = ROOT / "lectures"
 STT_MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "base")
 
@@ -79,8 +85,8 @@ class Lecture:
     title: str
     segments: list[dict]
     position: Position = field(default_factory=Position)
-    # Pre-rendered voice (services/prerender_audio.py). When present, the
-    # lecture NEVER touches a TTS model — it plays from disk.
+    # Pre-rendered voice (services/course-builder/prerender_audio.py). When
+    # present, the lecture NEVER touches a TTS model — it plays from disk.
     audio_dir: Path | None = None
     audio_rate: int | None = None
 
