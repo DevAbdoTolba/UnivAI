@@ -40,8 +40,10 @@ function Target-Help {
     Write-Host "  UnivAI - targets" -ForegroundColor White
     Write-Host ""
     $rows = @(
+        @("install","Install missing system tools: node, python, uv, docker, ollama"),
         @("setup",  "Install everything: node deps, python venv, RAG deps"),
         @("env",    "Create .env from .env.example if missing"),
+        @("models", "Download the voice models + the one local LLM (gemma3:1b)"),
         @("up",     "Start Postgres + Qdrant, apply the schema"),
         @("down",   "Stop the containers (data is kept)"),
         @("schema", "Apply infra/schema.sql (idempotent)"),
@@ -57,15 +59,58 @@ function Target-Help {
     )
     foreach ($r in $rows) { "    {0,-8} {1}" -f $r[0], $r[1] | Write-Host }
     Write-Host ""
-    Write-Host "  Typical first run:  ./run.ps1 setup ; ./run.ps1 up ; ./run.ps1 dev" -ForegroundColor DarkGray
+    Write-Host "  Typical first run:  ./run.ps1 install ; ./run.ps1 setup ; ./run.ps1 models ; ./run.ps1 up ; ./run.ps1 dev" -ForegroundColor DarkGray
     Write-Host ""
 }
 
 function Target-Env {
     if (-not (Test-Path ".env")) {
         Copy-Item ".env.example" ".env"
-        Warn "Created .env - fill in LIVEKIT_* before running the live lecture."
+        Warn "Created .env - defaults run fully local, no keys needed."
     }
+}
+
+function Target-Install {
+    $tools = @(
+        @("node",   "OpenJS.NodeJS.LTS"),
+        @("python", "Python.Python.3.12"),
+        @("uv",     "astral-sh.uv"),
+        @("docker", "Docker.DockerDesktop"),
+        @("ollama", "Ollama.Ollama")
+    )
+    foreach ($t in $tools) {
+        if (Get-Command $t[0] -ErrorAction SilentlyContinue) {
+            Write-Host ("  {0,-8} already installed" -f $t[0])
+        } else {
+            Say "installing $($t[0])"
+            winget install -e --id $t[1]
+        }
+    }
+    Warn "NOTE: Docker Desktop and Ollama may need one manual first launch,"
+    Warn "      and a new shell so PATH picks the tools up."
+    Say "next: ./run.ps1 setup ; ./run.ps1 models"
+}
+
+# One light local model, no fallback (LLM_FALLBACK stays empty in .env).
+$ModelsLlm  = "gemma3:1b"
+$KokoroUrl  = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+$PiperUrl   = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium"
+
+function Target-Models {
+    New-Item -ItemType Directory -Force models/kokoro, models/piper | Out-Null
+    $files = @(
+        @("models/kokoro/kokoro-v1.0.onnx",           "$KokoroUrl/kokoro-v1.0.onnx"),
+        @("models/kokoro/voices-v1.0.bin",            "$KokoroUrl/voices-v1.0.bin"),
+        @("models/piper/en_US-lessac-medium.onnx",      "$PiperUrl/en_US-lessac-medium.onnx?download=true"),
+        @("models/piper/en_US-lessac-medium.onnx.json", "$PiperUrl/en_US-lessac-medium.onnx.json?download=true")
+    )
+    foreach ($f in $files) {
+        if (Test-Path $f[0]) { Write-Host ("  {0} already there" -f $f[0]) }
+        else { Say "downloading $($f[0])"; curl.exe -L --fail -o $f[0] $f[1] }
+    }
+    Say "pulling local LLM '$ModelsLlm'"
+    ollama pull $ModelsLlm
+    Say "done (whisper downloads itself on first run)"
 }
 
 function Target-Setup {
@@ -156,8 +201,10 @@ function Target-Status {
 
 switch ($Target.ToLower()) {
     "help"   { Target-Help }
+    "install" { Target-Install }
     "setup"  { Target-Setup }
     "env"    { Target-Env }
+    "models" { Target-Models }
     "up"     { Target-Up }
     "down"   { Target-Down }
     "schema" { Target-Schema }

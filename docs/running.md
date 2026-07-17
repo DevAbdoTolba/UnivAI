@@ -3,29 +3,29 @@
 Two ways to do it: [by hand, service by service](#run-it-by-hand-service-by-service)
 (so you understand what exists), or [the one-command way](#the-one-command-way).
 
-## Before anything — what must be on your machine
-
-| Thing | Why | Check |
-|---|---|---|
-| Docker Desktop | Postgres, Qdrant and Mongo run as containers | `docker ps` works |
-| Node.js 20+ | the app, the exam system, the slide builder | `node -v` |
-| Python 3.12 + `uv` | voice worker + course generator; the RAG submodule uses uv | `python --version`, `uv --version` |
-| Ollama + 2 models | the local LLM that writes lectures and answers questions | `ollama pull llama3.2:3b` and `ollama pull qwen2.5:7b` |
-| Voice models | gitignored binaries, download once into `models/` | see below |
-| `.env` | copy `.env.example`; **LIVEKIT_\*** keys are the only must-fill | file exists |
-
-**Voice models (one-time download):**
-
-- `models/kokoro/kokoro-v1.0.onnx` + `models/kokoro/voices-v1.0.bin`
-  — from the [kokoro-onnx releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-- `models/piper/en_US-lessac-medium.onnx` (+ its `.json`)
-  — from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices)
-
-Then install everything once:
+## Bootstrap a brand-new machine (one time)
 
 ```bash
-make setup        # or: ./run.ps1 setup
+make install   # installs missing system tools: node, python, uv, docker, ollama
+make setup     # project deps: npm installs, python venv, submodules, RAG uv sync, .env
+make models    # downloads the voice models + the one local LLM (gemma3:1b, ~815 MB)
 ```
+
+(`./run.ps1 install` / `setup` / `models` on Windows without `make`.)
+
+What that covers — and the two honest caveats:
+
+| Piece | Who gets it |
+|---|---|
+| Node, Python, uv, Docker, Ollama | `make install` (winget on Windows, apt + official scripts on Linux) |
+| npm deps, venv, submodules, `.env` | `make setup` — the `.env` defaults run **fully local, zero keys** |
+| Kokoro + Piper voice files, `gemma3:1b` | `make models` (idempotent — skips what exists) |
+| Whisper (STT) | downloads itself on the worker's first run |
+
+Caveats: Docker Desktop and Ollama may need **one manual first launch** after
+installing, and a fresh shell so PATH updates. The local LLM is ONE light
+model — no fallback; plug a cloud provider (`groq:` / `gemini:` / `openai:` /
+`grok:` / `bedrock:`) into `LLM_PRIMARY` for heavier course generation.
 
 ## Run it by hand, service by service
 
@@ -127,7 +127,7 @@ make status      # containers, app, exams, RAG, and the virtual clock
 ## Notes nobody tells you
 
 - **A fresh system is empty on purpose.** First act: upload a PDF at `/upload`.
-  Indexing a 600-page book ≈ 12 min; generating the course on the local 3B ≈ 25 min
+  Indexing a 600-page book ≈ 12 min; generating the course on the small local model ≈ 25 min
   (size M). Progress shows live on `/upload` and `/admin`.
 - **Time is virtual.** Lectures schedule themselves starting "tomorrow 10:00" —
   drive the clock from `/admin` ("jump to next lecture start") instead of waiting.

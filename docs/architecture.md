@@ -14,7 +14,7 @@ Six processes, three containers, one virtual clock.
 | Postgres | container `univai-db` | 5433 | books, lectures, attendance, grades, qa_log, **clock_state** |
 | Qdrant | container `univai-qdrant` | 6333 | the RAG's vectors |
 | Mongo | container `univai-mongo` | 27017 | the exam system's world |
-| Ollama | host service | 11434 | the local LLM (`llama3.2:3b`, fallback `qwen2.5:7b`) |
+| Ollama | host service | 11434 | the one local LLM (`gemma3:1b` — light and fast; cloud providers plug in via `.env`) |
 
 ## How data flows
 
