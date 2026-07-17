@@ -1,13 +1,14 @@
-"""LLM adapter with automatic failover (§3 of the MVP-1 prompt).
+"""LLM adapter. Every LLM call in the system goes through complete().
 
-Every LLM call in the system goes through complete(). Model strings use
-"provider:model" syntax so the team can swap providers by editing .env only:
+Model strings use "provider:model" syntax so the team can swap providers by
+editing .env only. Providers: ollama | gemini | openai | groq | grok | bedrock
+(openai/groq/grok/bedrock also take a *_BASE_URL for compatible gateways).
 
-    LLM_PRIMARY=gemini:gemini-2.5-flash
-    LLM_FALLBACK=ollama:gemma3:4b
+    LLM_PRIMARY=ollama:gemma3:1b
+    LLM_FALLBACK=                      # optional — empty means one model, no net
 
-Rule: try PRIMARY, retry once on ANY error, then switch to FALLBACK for that
-request. Always report which model actually served the request.
+Rule: try PRIMARY, retry once on ANY error, then switch to FALLBACK if one is
+set. Always report which model actually served the request.
 """
 
 from __future__ import annotations
@@ -81,14 +82,20 @@ def _call_gemini(
         raise LLMError(f"malformed Gemini response: {str(data)[:300]}") from exc
 
 
-def _call_openai(
-    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+def _call_openai_style(
+    base: str,
+    key_env: str,
+    model: str,
+    system: str,
+    prompt: str,
+    max_tokens: int | None,
+    timeout: float,
 ) -> str:
-    key = os.getenv("OPENAI_API_KEY", "")
+    """The chat-completions dialect OpenAI popularized — Groq, xAI and most
+    gateways speak it too, so one core serves them all."""
+    key = os.getenv(key_env, "")
     if not key:
-        raise LLMError("OPENAI_API_KEY is not set")
-    # Any OpenAI-compatible gateway (a course sandbox, a proxy) plugs in here.
-    base = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+        raise LLMError(f"{key_env} is not set")
     payload = {
         "model": model,
         "messages": [
@@ -99,7 +106,7 @@ def _call_openai(
     if max_tokens:
         payload["max_tokens"] = max_tokens
     data = _post_json(
-        f"{base}/chat/completions",
+        f"{base.rstrip('/')}/chat/completions",
         payload,
         {"Authorization": f"Bearer {key}"},
         timeout,
@@ -107,7 +114,29 @@ def _call_openai(
     try:
         return data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError) as exc:
-        raise LLMError(f"malformed OpenAI response: {str(data)[:300]}") from exc
+        raise LLMError(f"malformed response from {base}: {str(data)[:300]}") from exc
+
+
+def _call_openai(
+    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+) -> str:
+    # Any OpenAI-compatible gateway (a course sandbox, a proxy) plugs in here.
+    base = os.getenv("OPENAI_BASE_URL", "") or "https://api.openai.com/v1"
+    return _call_openai_style(base, "OPENAI_API_KEY", model, system, prompt, max_tokens, timeout)
+
+
+def _call_groq(
+    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+) -> str:
+    base = os.getenv("GROQ_BASE_URL", "") or "https://api.groq.com/openai/v1"
+    return _call_openai_style(base, "GROQ_API_KEY", model, system, prompt, max_tokens, timeout)
+
+
+def _call_grok(
+    model: str, system: str, prompt: str, max_tokens: int | None, timeout: float
+) -> str:
+    base = os.getenv("XAI_BASE_URL", "") or "https://api.x.ai/v1"
+    return _call_openai_style(base, "XAI_API_KEY", model, system, prompt, max_tokens, timeout)
 
 
 def _call_bedrock(
@@ -194,11 +223,17 @@ def _dispatch(
         return _call_gemini(model, system, prompt, max_tokens, timeout)
     if provider == "openai":
         return _call_openai(model, system, prompt, max_tokens, timeout)
+    if provider == "groq":
+        return _call_groq(model, system, prompt, max_tokens, timeout)
+    if provider in ("grok", "xai"):
+        return _call_grok(model, system, prompt, max_tokens, timeout)
     if provider == "bedrock":
         return _call_bedrock(model, system, prompt, max_tokens, timeout)
     if provider == "ollama":
         return _call_ollama(model, system, prompt, max_tokens, timeout)
-    raise LLMError(f"unknown provider '{provider}' (use gemini|openai|bedrock|ollama)")
+    raise LLMError(
+        f"unknown provider '{provider}' (use ollama|gemini|openai|groq|grok|bedrock)"
+    )
 
 
 def complete(
