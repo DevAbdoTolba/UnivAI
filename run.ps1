@@ -97,12 +97,14 @@ $KokoroUrl  = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/mod
 $PiperUrl   = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium"
 
 function Target-Models {
-    New-Item -ItemType Directory -Force models/kokoro, models/piper | Out-Null
+    # The voice model files belong to the Mouth cave (UnivAI-live), not the campus root.
+    $voiceDir = "UnivAI-live/models"
+    New-Item -ItemType Directory -Force "$voiceDir/kokoro", "$voiceDir/piper" | Out-Null
     $files = @(
-        @("models/kokoro/kokoro-v1.0.onnx",           "$KokoroUrl/kokoro-v1.0.onnx"),
-        @("models/kokoro/voices-v1.0.bin",            "$KokoroUrl/voices-v1.0.bin"),
-        @("models/piper/en_US-lessac-medium.onnx",      "$PiperUrl/en_US-lessac-medium.onnx?download=true"),
-        @("models/piper/en_US-lessac-medium.onnx.json", "$PiperUrl/en_US-lessac-medium.onnx.json?download=true")
+        @("$voiceDir/kokoro/kokoro-v1.0.onnx",           "$KokoroUrl/kokoro-v1.0.onnx"),
+        @("$voiceDir/kokoro/voices-v1.0.bin",            "$KokoroUrl/voices-v1.0.bin"),
+        @("$voiceDir/piper/en_US-lessac-medium.onnx",      "$PiperUrl/en_US-lessac-medium.onnx?download=true"),
+        @("$voiceDir/piper/en_US-lessac-medium.onnx.json", "$PiperUrl/en_US-lessac-medium.onnx.json?download=true")
     )
     foreach ($f in $files) {
         if (Test-Path $f[0]) { Write-Host ("  {0} already there" -f $f[0]) }

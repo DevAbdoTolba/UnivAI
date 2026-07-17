@@ -78,14 +78,17 @@ MODELS_LLM ?= gemma3:1b
 KOKORO_URL := https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
 PIPER_URL  := https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium
 
+# The voice model files belong to the Mouth cave (UnivAI-live), not the campus root.
+VOICE_DIR := UnivAI-live/models
+
 models: ## Download the voice models + the one local LLM (MODELS_LLM)
-	@mkdir -p models/kokoro models/piper
-	@test -f models/kokoro/kokoro-v1.0.onnx || curl -L --fail -o models/kokoro/kokoro-v1.0.onnx $(KOKORO_URL)/kokoro-v1.0.onnx
-	@test -f models/kokoro/voices-v1.0.bin  || curl -L --fail -o models/kokoro/voices-v1.0.bin $(KOKORO_URL)/voices-v1.0.bin
-	@test -f models/piper/en_US-lessac-medium.onnx      || curl -L --fail -o models/piper/en_US-lessac-medium.onnx "$(PIPER_URL)/en_US-lessac-medium.onnx?download=true"
-	@test -f models/piper/en_US-lessac-medium.onnx.json || curl -L --fail -o models/piper/en_US-lessac-medium.onnx.json "$(PIPER_URL)/en_US-lessac-medium.onnx.json?download=true"
+	@mkdir -p $(VOICE_DIR)/kokoro $(VOICE_DIR)/piper
+	@test -f $(VOICE_DIR)/kokoro/kokoro-v1.0.onnx || curl -L --fail -o $(VOICE_DIR)/kokoro/kokoro-v1.0.onnx $(KOKORO_URL)/kokoro-v1.0.onnx
+	@test -f $(VOICE_DIR)/kokoro/voices-v1.0.bin  || curl -L --fail -o $(VOICE_DIR)/kokoro/voices-v1.0.bin $(KOKORO_URL)/voices-v1.0.bin
+	@test -f $(VOICE_DIR)/piper/en_US-lessac-medium.onnx      || curl -L --fail -o $(VOICE_DIR)/piper/en_US-lessac-medium.onnx "$(PIPER_URL)/en_US-lessac-medium.onnx?download=true"
+	@test -f $(VOICE_DIR)/piper/en_US-lessac-medium.onnx.json || curl -L --fail -o $(VOICE_DIR)/piper/en_US-lessac-medium.onnx.json "$(PIPER_URL)/en_US-lessac-medium.onnx.json?download=true"
 	@ollama pull $(MODELS_LLM)
-	@echo "voice models in models/, local LLM '$(MODELS_LLM)' ready (whisper downloads itself on first run)"
+	@echo "voice models in $(VOICE_DIR)/, local LLM '$(MODELS_LLM)' ready (whisper downloads itself on first run)"
 
 # ---------------------------------------------------------------- infrastructure
 
