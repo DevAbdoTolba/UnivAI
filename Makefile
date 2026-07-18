@@ -10,12 +10,19 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 COMPOSE  := docker compose -f infra/docker-compose.yml
+# SYSPY: whatever python the machine has (ubuntu ships python3 only, some
+# windows only the py launcher). Its single job is creating the venv;
+# after that everything goes through $(PY), and pip is always $(PY) -m pip.
+# Probed by running, not by PATH lookup: Windows plants a fake python3 stub
+# in WindowsApps that only opens the Microsoft Store.
+SYSPY := $(shell for p in python3 python py; do $$p -c "" >/dev/null 2>&1 && { echo $$p; break; }; done)
+ifeq ($(SYSPY),)
+SYSPY := python3
+endif
 ifeq ($(OS),Windows_NT)
-PY  := .venv/Scripts/python.exe
-PIP := .venv/Scripts/pip.exe
+PY := .venv/Scripts/python.exe
 else
-PY  := .venv/bin/python
-PIP := .venv/bin/pip
+PY := .venv/bin/python
 endif
 DB       := docker exec -i univai-db psql -U univai -d univai
 # 3100, not 3000: the exam system's "back to UnivAI" buttons point at 3100
@@ -38,7 +45,7 @@ help: ## Show this help
 install: ## Install missing system tools: node, python, uv, docker, ollama
 ifeq ($(OS),Windows_NT)
 	@command -v node    >/dev/null 2>&1 || winget install -e --id OpenJS.NodeJS.LTS
-	@command -v python  >/dev/null 2>&1 || winget install -e --id Python.Python.3.12
+	@python -c "" >/dev/null 2>&1 || py -c "" >/dev/null 2>&1 || winget install -e --id Python.Python.3.12
 	@command -v uv      >/dev/null 2>&1 || winget install -e --id astral-sh.uv
 	@command -v docker  >/dev/null 2>&1 || winget install -e --id Docker.DockerDesktop
 	@command -v ollama  >/dev/null 2>&1 || winget install -e --id Ollama.Ollama
@@ -57,9 +64,9 @@ setup: env ## Install everything: node deps, python venv, exam deps, RAG deps
 	@echo "==> app dependencies"
 	cd app && npm install
 	@echo "==> python venv + voice (UnivAI-live) dependencies"
-	python -m venv .venv
-	$(PIP) install --upgrade pip
-	$(PIP) install -r services/requirements.txt
+	$(SYSPY) -m venv .venv
+	$(PY) -m pip install --upgrade pip
+	$(PY) -m pip install -r services/requirements.txt
 	@echo "==> submodules"
 	git submodule update --init --recursive
 	@echo "==> exam system (UnivAI-exam_system submodule)"
