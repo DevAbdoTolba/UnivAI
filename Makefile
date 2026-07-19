@@ -61,8 +61,8 @@ endif
 	@echo "tools ready — next: make setup && make models"
 
 setup: env ## Install everything: node deps, python venv, exam deps, RAG deps
-	@echo "==> app dependencies"
-	cd app && npm install
+	@echo "==> app dependencies (UnivAI-app submodule)"
+	cd UnivAI-app && npm install
 	@echo "==> python venv + voice (UnivAI-live) dependencies"
 	$(SYSPY) -m venv .venv
 	$(PY) -m pip install --upgrade pip
@@ -122,7 +122,7 @@ rag: ## Run the team's RAG MCP server (needs Qdrant) — :8000
 	cd UnivAI-Agent && uv run python mcp_server.py
 
 app: ## Run the Next.js app — :$(APP_PORT)
-	cd app && npx next dev -p $(APP_PORT)
+	cd UnivAI-app && npx next dev -p $(APP_PORT)
 
 worker: ## Run the live-lecture voice agent (TTS + STT). Needs LIVEKIT_* keys
 	$(PY) UnivAI-live/worker.py dev
@@ -130,7 +130,7 @@ worker: ## Run the live-lecture voice agent (TTS + STT). Needs LIVEKIT_* keys
 exams: ## Run the exam system (UnivAI-exam_system) - :3200
 	cd UnivAI-exam_system && npm run dev
 
-slides: ## Build the Slidev decks to app/public/slides/
+slides: ## Build the Slidev decks to UnivAI-app/public/slides/
 	node scripts/build-slides.mjs
 
 # ---------------------------------------------------------------- everything at once
@@ -143,7 +143,7 @@ ifeq ($(OS),Windows_NT)
 # Git Bash mangles single-slash cmd switches (/k -> K:/) and its `start`
 # wrapper breaks && chains, so: // switches, /D for the workdir, no &&.
 	@start "UnivAI RAG"    //D UnivAI-Agent cmd //k "uv run python mcp_server.py"
-	@start "UnivAI app"    //D app cmd //k "npx next dev -p $(APP_PORT)"
+	@start "UnivAI app"    //D UnivAI-app cmd //k "npx next dev -p $(APP_PORT)"
 	@start "UnivAI worker" cmd //k ".venv\Scripts\python.exe UnivAI-live\worker.py dev"
 	@start "UnivAI exams"  //D UnivAI-exam_system cmd //k "npm run dev"
 else

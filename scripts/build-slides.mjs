@@ -13,7 +13,7 @@ import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LECTURES = path.join(ROOT, "lectures");
-const OUT = path.join(ROOT, "app", "public", "slides");
+const OUT = path.join(ROOT, "UnivAI-app", "public", "slides");
 
 if (!existsSync(LECTURES)) {
   console.error("No lectures/ directory — nothing to build.");
@@ -35,7 +35,7 @@ for (const week of weeks) {
     continue;
   }
   const outDir = path.join(OUT, week);
-  console.log(`Building ${week} → app/public/slides/${week}/`);
+  console.log(`Building ${week} → UnivAI-app/public/slides/${week}/`);
   // Use the locally installed CLI: `npx --yes` cannot install the theme
   // non-interactively, and fails with "theme not found".
   execSync(`npx slidev build "${deck}" --out "${outDir}" --base "/slides/${week}/"`, {

@@ -22,7 +22,7 @@ voice as the lecture, also gitignored.
 
 ## Who reads what
 
-- the **app** reads `script.json` (titles, schedule) and serves the built decks
+- the **UnivAI-app** submodule reads `script.json` (titles, schedule) and serves the built decks
 - the **voice worker** plays `audio/` and follows `script.json`
 - the **exam system** gets `quiz.json` synced into its Mongo question bank on
   every exam start

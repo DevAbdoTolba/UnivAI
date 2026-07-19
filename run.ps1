@@ -52,7 +52,7 @@ function Target-Help {
         @("app",    "Run the Next.js app            (:$AppPort)"),
         @("worker", "Run the live-lecture voice agent (needs LIVEKIT_* keys)"),
         @("exams",  "Run the exam system (:3200)"),
-        @("slides", "Build the Slidev decks to app/public/slides/"),
+        @("slides", "Build the Slidev decks to UnivAI-app/public/slides/"),
         @("dev",    "Start infra, then RAG + app + worker in separate windows"),
         @("status", "Show what is running"),
         @("clean",  "Remove containers AND volumes (destroys the DB and the vectors)")
@@ -117,8 +117,8 @@ function Target-Models {
 
 function Target-Setup {
     Target-Env
-    Say "app dependencies"
-    Push-Location app; npm install; Pop-Location
+    Say "app dependencies (UnivAI-app submodule)"
+    Push-Location UnivAI-app; npm install; Pop-Location
 
     Say "python venv + voice (UnivAI-live) dependencies"
     if (-not (Test-Path ".venv")) { python -m venv .venv }
@@ -158,7 +158,7 @@ function Target-Reset {
 }
 
 function Target-Rag    { Push-Location UnivAI-Agent; uv run python mcp_server.py; Pop-Location }
-function Target-App    { Push-Location app; npx next dev -p $AppPort; Pop-Location }
+function Target-App    { Push-Location UnivAI-app; npx next dev -p $AppPort; Pop-Location }
 function Target-Worker { & $Py UnivAI-live/worker.py dev }
 function Target-Slides { node scripts/build-slides.mjs }
 function Target-Exams  { Push-Location UnivAI-exam_system; npm run dev; Pop-Location }

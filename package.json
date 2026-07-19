@@ -1,7 +1,7 @@
 {
   "name": "univai-tools",
   "private": true,
-  "description": "Repo-level tooling. The web app is its own package in app/.",
+  "description": "Repo-level tooling. The web app lives in the UnivAI-app submodule.",
   "scripts": {
     "slides": "node scripts/build-slides.mjs"
   },

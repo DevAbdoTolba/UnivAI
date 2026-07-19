@@ -42,13 +42,12 @@ book.pdf ──▶ RAG (index it) ──▶ course generator (LLM) ──▶ 4 w
 ## Repo layout
 
 ```
-app/                  Next.js 16 — all UI + API routes (pure MUI)
+UnivAI-app/          the Face (submodule): Next.js 16 — all UI + API routes + integration
 services/             shared Python plumbing (clock, db, LLM adapter, RAG client) + rag CLIs
 lectures/week-N/      GENERATED from your book: slides.md, script.json, quiz.json
 UnivAI-Agent/         the Brain (submodule): RAG service + course generation
 UnivAI-live/          the Mouth + ears (submodule): LiveKit rooms, TTS, STT, the live class
 UnivAI-exam_system/   the Judge (submodule): exams, proctoring, records — port 3200
-UnivAI-app/           the Face (submodule): dashboard/UI prototype
 infra/                docker-compose (Postgres, Qdrant, LiveKit, Mongo) + schema.sql
 logs/                 every service and build log lands here
 ```

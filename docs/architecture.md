@@ -6,7 +6,7 @@ Six processes, three containers, one virtual clock.
 
 | Piece | Where | Port | Job |
 |---|---|---|---|
-| **app** (Next.js 16) | `app/` | **3100** | every page + API route; owns Postgres |
+| **UnivAI-app** (Next.js 16) | `UnivAI-app/` | **3100** | every page + API route; owns Postgres |
 | **voice worker** (Mouth + ears) | `UnivAI-live/` | — | the Lecturer: joins LiveKit rooms, plays the pre-recorded voice, answers raised hands |
 | **course generator** (Brain) | `UnivAI-Agent/generation/` | — | book PDF → 4 weeks of slides + narration + quizzes (spawned by the app, watch `logs/lecture-gen.log`) |
 | **RAG server** (Brain) | `UnivAI-Agent/` | 8000 | indexes the book, answers retrieval queries over MCP |
@@ -24,7 +24,7 @@ Six processes, three containers, one virtual clock.
     │  2. RAG ingests the book          → Qdrant
     │  3. lecture_gen.py writes         → lectures/week-N/{slides.md, script.json, quiz.json}
     │  4. prerender_audio.py records    → lectures/week-N/audio/*.npy   (the lecturer's voice)
-    │  5. build-slides.mjs builds decks → app/public/slides/week-N/
+    │  5. build-slides.mjs builds decks → UnivAI-app/public/slides/week-N/
     ▼
  /schedule ── /lecture/[id] ──▶ LiveKit room ◀── voice worker
     │                              │  raise hand → STT → RAG → LLM → spoken answer
@@ -38,7 +38,7 @@ Six processes, three containers, one virtual clock.
 ## Rules the code lives by
 
 - **The virtual clock is law.** Nothing reads the wall clock except
-  `app/lib/clock.ts` and `services/common/clock.py`. Everything else asks the
+  `UnivAI-app/lib/clock.ts` and `services/common/clock.py`. Everything else asks the
   ClockService (wall clock + `clock_state.offset_ms` in Postgres). That's why
   `/admin` can time-travel and attendance/exam windows follow.
 - **The 90/10 quiz rule.** Every generated question is tagged `lecture` or

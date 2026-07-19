@@ -72,7 +72,7 @@ proctoring report back to the app.
 ### 4. The app (`:3100`)
 
 ```bash
-cd app
+cd UnivAI-app
 npx next dev -p 3100
 ```
 
@@ -98,7 +98,7 @@ Whisper) — the room honestly shows "preparing" until then.
 node scripts/build-slides.mjs      # or: make slides
 ```
 
-Builds the Slidev decks into `app/public/slides/`. Course generation runs
+Builds the Slidev decks into `UnivAI-app/public/slides/`. Course generation runs
 this itself — you only need it if you hand-edited `lectures/week-N/slides.md`.
 
 ## The one-command way

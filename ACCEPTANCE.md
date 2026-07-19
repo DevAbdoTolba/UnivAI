@@ -7,7 +7,7 @@ Verified on 2026-07-14 against the running app (Next.js dev on :3100, Postgres o
 | # | Check | Result |
 |---|---|---|
 | 1 | Next.js app builds clean (13 routes, TypeScript strict) | PASS — `npm run build` |
-| 2 | **MUI purity**: no `sx=`, no `style=`, no `styled(`, no `.css`, no `createTheme` | PASS — 0 hits in `app/` and `lib/` |
+| 2 | **MUI purity**: no `sx=`, no `style=`, no `styled(`, no `.css`, no `createTheme` | PASS — 0 hits in `UnivAI-app/app/` and `UnivAI-app/lib/` |
 | 3 | Virtual clock: set / advance / jump-to-next-lecture / reset, persisted in Postgres | PASS |
 | 4 | Clock is shared by the app and the Python services (one `clock_state` row) | PASS |
 | 5 | Schedule seeds itself: 4 weekly lectures from the premade `lectures/week-N/` | PASS |
