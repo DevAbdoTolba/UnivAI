@@ -1,8 +1,9 @@
 /**
- * Build every premade Slidev deck to static HTML, served by the Next.js app at
- * /slides/week-N/ and embedded in the lecture page's iframe.
+ * Build a student's premade Slidev decks to static HTML, served by the Next.js
+ * app at /slides/<studentId>/week-N/ and embedded in the lecture page's iframe.
  *
- *   node scripts/build-slides.mjs
+ *   node scripts/build-slides.mjs <studentId>   # one student (multi-tenant)
+ *   node scripts/build-slides.mjs               # legacy global lectures/week-N
  *
  * Slidev is invoked via npx so it stays out of the app's dependency tree.
  */
@@ -12,11 +13,17 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const LECTURES = path.join(ROOT, "lectures");
-const OUT = path.join(ROOT, "UnivAI-app", "public", "slides");
+
+// A studentId (S-YYYY-NNNNNN) scopes the build to that learner's course.
+const sid = process.argv[2] || null;
+const LECTURES = sid ? path.join(ROOT, "lectures", sid) : path.join(ROOT, "lectures");
+const OUT = sid
+  ? path.join(ROOT, "UnivAI-app", "public", "slides", sid)
+  : path.join(ROOT, "UnivAI-app", "public", "slides");
+const BASE_PREFIX = sid ? `/slides/${sid}` : "/slides";
 
 if (!existsSync(LECTURES)) {
-  console.error("No lectures/ directory — nothing to build.");
+  console.error(`No ${path.relative(ROOT, LECTURES)}/ directory — nothing to build.`);
   process.exit(1);
 }
 
@@ -24,7 +31,7 @@ mkdirSync(OUT, { recursive: true });
 
 const weeks = readdirSync(LECTURES).filter((name) => /^week-\d+$/.test(name));
 if (!weeks.length) {
-  console.error("No week-N folders in lectures/.");
+  console.error(`No week-N folders in ${path.relative(ROOT, LECTURES)}/.`);
   process.exit(1);
 }
 
@@ -35,13 +42,13 @@ for (const week of weeks) {
     continue;
   }
   const outDir = path.join(OUT, week);
-  console.log(`Building ${week} → UnivAI-app/public/slides/${week}/`);
+  console.log(`Building ${week} → ${path.relative(ROOT, outDir)}/`);
   // Use the locally installed CLI: `npx --yes` cannot install the theme
   // non-interactively, and fails with "theme not found".
-  execSync(`npx slidev build "${deck}" --out "${outDir}" --base "/slides/${week}/"`, {
+  execSync(`npx slidev build "${deck}" --out "${outDir}" --base "${BASE_PREFIX}/${week}/"`, {
     stdio: "inherit",
     cwd: ROOT,
   });
 }
 
-console.log("\nDone. The lecture page will serve these from /slides/week-N/.");
+console.log(`\nDone. The lecture page serves these from ${BASE_PREFIX}/week-N/.`);

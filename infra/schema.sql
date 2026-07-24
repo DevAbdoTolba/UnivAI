@@ -175,3 +175,35 @@ CREATE TABLE IF NOT EXISTS auth_audit (
 );
 CREATE INDEX IF NOT EXISTS auth_audit_target_idx ON auth_audit (target_id);
 CREATE INDEX IF NOT EXISTS auth_audit_created_idx ON auth_audit (created_at DESC);
+
+-- ===========================================================================
+-- Phase 5 — per-student multi-tenancy.  See docs/auth-plan.md §5.
+--
+-- Tenant key is the human-readable user.studentId (S-YYYY-NNNNNN), threaded
+-- across every service (RAG namespace, LiveKit identity, lecture/slide disk
+-- dirs, exam records). Each learner owns their own book, course, attendance,
+-- grades and Q&A; every app query filters by student_id.
+--
+-- Existing single-tenant demo rows keep student_id = NULL (they belong to no
+-- one and are simply re-created per user on the next upload). No backfill.
+-- ===========================================================================
+ALTER TABLE books      ADD COLUMN IF NOT EXISTS student_id TEXT;
+ALTER TABLE lectures   ADD COLUMN IF NOT EXISTS student_id TEXT;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS student_id TEXT;
+ALTER TABLE grades     ADD COLUMN IF NOT EXISTS student_id TEXT;
+ALTER TABLE qa_log     ADD COLUMN IF NOT EXISTS student_id TEXT;
+
+-- Single-student uniqueness becomes per-student uniqueness. Drop the old
+-- auto-named UNIQUE constraints (present on already-migrated DBs, absent on
+-- fresh ones — DROP ... IF EXISTS covers both) and re-add as composite indexes.
+ALTER TABLE lectures   DROP CONSTRAINT IF EXISTS lectures_week_key;
+ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_lecture_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS lectures_student_week_key    ON lectures   (student_id, week);
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_student_lecture_key ON attendance (student_id, lecture_id);
+
+-- Owner-scoped read paths.
+CREATE INDEX IF NOT EXISTS books_student_idx    ON books    (student_id);
+CREATE INDEX IF NOT EXISTS grades_student_idx   ON grades   (student_id);
+CREATE INDEX IF NOT EXISTS qa_log_student_idx   ON qa_log   (student_id);
+-- (Referential FKs to "user"("studentId") with ON DELETE CASCADE are a later
+-- hardening step; ownership is enforced in the app layer today.)
