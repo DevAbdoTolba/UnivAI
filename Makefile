@@ -211,7 +211,7 @@ env: ## Create .env from .env.example if it does not exist
 
 # One light local model, no fallback (LLM_FALLBACK stays empty in .env).
 # Swap with:  make models MODELS_LLM=gemma3:4b
-MODELS_LLM ?= gemma3:1b
+MODELS_LLM ?= qwen2.5:0.5b
 KOKORO_URL := https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
 PIPER_URL  := https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium
 
