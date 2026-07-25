@@ -29,7 +29,21 @@ DB       := docker exec -i univai-db psql -U univai -d univai
 # (UNIVAI_APP_URL in UnivAI-exam_system/.env.local). Keep them in step.
 APP_PORT ?= 3100
 
-.PHONY: help install setup env models up down schema reset rag app worker exams slides dev status clean
+# Minimum Node version accepted by UnivAI.
+# Versions above NODE_TESTED_MAJOR are accepted, but produce a warning.
+NODE_MIN_MAJOR    ?= 20
+NODE_TESTED_MAJOR ?= 24
+
+# The Windows MSI normally installs Node here. Git Bash may have an old PATH
+# even though Windows already has Node installed, so recover that directory.
+ifeq ($(OS),Windows_NT)
+WINDOWS_NODE_DIR := $(shell [ -x "/c/Program Files/nodejs/node.exe" ] && printf '%s' "/c/Program Files/nodejs")
+ifneq ($(WINDOWS_NODE_DIR),)
+export PATH := $(WINDOWS_NODE_DIR):$(PATH)
+endif
+endif
+
+.PHONY: help install install-node node-check setup env models up down schema reset rag app worker exams slides dev status clean
 
 help: ## Show this help
 	@echo ""
@@ -42,37 +56,153 @@ help: ## Show this help
 
 # ---------------------------------------------------------------- setup
 
-install: ## Install missing system tools: node, python, uv, docker, ollama
+node-check: ## Verify that Node.js and npm are usable
+	@set -eu; \
+	version="$$(node -p 'process.versions.node' 2>/dev/null || true)"; \
+	if [ -z "$$version" ]; then \
+		echo "ERROR: Node.js is missing or is not visible to this shell."; \
+		if [ "$(OS)" = "Windows_NT" ]; then \
+			echo "Close and reopen Git Bash/PowerShell, then run: make node-check"; \
+		fi; \
+		exit 1; \
+	fi; \
+	major="$${version%%.*}"; \
+	case "$$major" in ''|*[!0-9]*) \
+		echo "ERROR: Could not parse Node.js version '$$version'."; \
+		exit 1;; \
+	esac; \
+	if [ "$$major" -lt "$(NODE_MIN_MAJOR)" ]; then \
+		echo "ERROR: Node.js v$$version found; UnivAI requires Node.js $(NODE_MIN_MAJOR)+."; \
+		exit 1; \
+	fi; \
+	if ! command -v npm >/dev/null 2>&1; then \
+		echo "ERROR: Node.js v$$version is available, but npm is missing."; \
+		exit 1; \
+	fi; \
+	if [ "$$major" -gt "$(NODE_TESTED_MAJOR)" ]; then \
+		echo "WARNING: Node.js v$$version is newer than the tested Node $(NODE_TESTED_MAJOR) release."; \
+	fi; \
+	echo "Node.js v$$version and npm $$(npm --version) are ready"
+
+install-node:
 ifeq ($(OS),Windows_NT)
-	@command -v node    >/dev/null 2>&1 || winget install -e --id OpenJS.NodeJS.LTS
-	@python -c "" >/dev/null 2>&1 || py -c "" >/dev/null 2>&1 || winget install -e --id Python.Python.3.12
-	@command -v uv      >/dev/null 2>&1 || winget install -e --id astral-sh.uv
-	@command -v docker  >/dev/null 2>&1 || winget install -e --id Docker.DockerDesktop
-	@command -v ollama  >/dev/null 2>&1 || winget install -e --id Ollama.Ollama
+	@set -eu; \
+	version="$$(node -p 'process.versions.node' 2>/dev/null || true)"; \
+	if [ -n "$$version" ]; then \
+		major="$${version%%.*}"; \
+		if [ "$$major" -ge "$(NODE_MIN_MAJOR)" ]; then \
+			echo "Node.js v$$version already satisfies $(NODE_MIN_MAJOR)+"; \
+			if [ "$$major" -gt "$(NODE_TESTED_MAJOR)" ]; then \
+				echo "WARNING: Node.js v$$version is newer than tested Node $(NODE_TESTED_MAJOR)."; \
+			fi; \
+			exit 0; \
+		fi; \
+		echo "ERROR: Node.js v$$version is installed but is too old."; \
+		echo "Upgrade Node.js to $(NODE_MIN_MAJOR)+, then rerun make install."; \
+		exit 1; \
+	fi; \
+	echo "==> installing Node.js LTS"; \
+	if ! winget install -e --id OpenJS.NodeJS.LTS \
+		--accept-package-agreements \
+		--accept-source-agreements \
+		--disable-interactivity; then \
+		if [ -x "/c/Program Files/nodejs/node.exe" ]; then \
+			echo "winget returned an error, but Node.js exists in the standard installation directory."; \
+		else \
+			if winget list -e --name "Node.js" \
+				--accept-source-agreements 2>/dev/null | grep -qi "Node.js"; then \
+				echo "ERROR: Windows reports Node.js as installed, but this shell cannot find it."; \
+				echo "Reopen the terminal or add the Node.js installation directory to PATH."; \
+			else \
+				echo "ERROR: Node.js installation failed."; \
+			fi; \
+			exit 1; \
+		fi; \
+	fi; \
+	$(MAKE) --no-print-directory node-check
+else
+	@set -eu; \
+	version="$$(node -p 'process.versions.node' 2>/dev/null || true)"; \
+	if [ -n "$$version" ]; then \
+		major="$${version%%.*}"; \
+		if [ "$$major" -ge "$(NODE_MIN_MAJOR)" ]; then \
+			echo "Node.js v$$version already satisfies $(NODE_MIN_MAJOR)+"; \
+			if [ "$$major" -gt "$(NODE_TESTED_MAJOR)" ]; then \
+				echo "WARNING: Node.js v$$version is newer than tested Node $(NODE_TESTED_MAJOR)."; \
+			fi; \
+			exit 0; \
+		fi; \
+		echo "Node.js v$$version is too old; trying the configured APT repositories."; \
+	else \
+		echo "==> installing Node.js and npm"; \
+	fi; \
+	sudo apt-get update; \
+	sudo apt-get install -y nodejs npm; \
+	if ! $(MAKE) --no-print-directory node-check; then \
+		echo "ERROR: Your Linux repository did not provide Node.js $(NODE_MIN_MAJOR)+."; \
+		echo "Install a newer Node.js release using your distribution's supported method."; \
+		exit 1; \
+	fi
+endif
+
+
+install: install-node ## Install missing system tools: node, python, uv, docker, ollama
+ifeq ($(OS),Windows_NT)
+	@python -c "" >/dev/null 2>&1 || py -c "" >/dev/null 2>&1 || \
+		winget install -e --id Python.Python.3.12 \
+			--accept-package-agreements \
+			--accept-source-agreements \
+			--disable-interactivity
+	@command -v uv >/dev/null 2>&1 || \
+		winget install -e --id astral-sh.uv \
+			--accept-package-agreements \
+			--accept-source-agreements \
+			--disable-interactivity
+	@command -v docker >/dev/null 2>&1 || \
+		winget install -e --id Docker.DockerDesktop \
+			--accept-package-agreements \
+			--accept-source-agreements \
+			--disable-interactivity
+	@command -v ollama >/dev/null 2>&1 || \
+		winget install -e --id Ollama.Ollama \
+			--accept-package-agreements \
+			--accept-source-agreements \
+			--disable-interactivity
 	@echo "NOTE: Docker Desktop and Ollama may need one manual first launch,"
 	@echo "      and a new shell so PATH picks the tools up."
 else
-	@command -v node    >/dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y nodejs npm; } || echo "!! install Node 20+ manually"
-	@command -v python3 >/dev/null 2>&1 || sudo apt-get install -y python3 python3-venv python3-pip
-	@command -v uv      >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
-	@command -v docker  >/dev/null 2>&1 || curl -fsSL https://get.docker.com | sh
-	@command -v ollama  >/dev/null 2>&1 || curl -fsSL https://ollama.com/install.sh | sh
+	@command -v python3 >/dev/null 2>&1 || { \
+		sudo apt-get update && \
+		sudo apt-get install -y python3 python3-venv python3-pip; \
+	}
+	@command -v uv >/dev/null 2>&1 || \
+		curl -LsSf https://astral.sh/uv/install.sh | sh
+	@command -v docker >/dev/null 2>&1 || \
+		curl -fsSL https://get.docker.com | sh
+	@command -v ollama >/dev/null 2>&1 || \
+		curl -fsSL https://ollama.com/install.sh | sh
 endif
 	@echo "tools ready — next: make setup && make models"
-
 setup: env ## Install everything: node deps, python venv, exam deps, RAG deps
+	@$(MAKE) --no-print-directory node-check
+
+	@echo "==> submodules"
+	git submodule update --init --recursive
+
 	@echo "==> app dependencies (UnivAI-app submodule)"
 	cd UnivAI-app && npm install
+
 	@echo "==> python venv + voice (UnivAI-live) dependencies"
 	$(SYSPY) -m venv .venv
 	$(PY) -m pip install --upgrade pip
 	$(PY) -m pip install -r services/requirements.txt
-	@echo "==> submodules"
-	git submodule update --init --recursive
+
 	@echo "==> exam system (UnivAI-exam_system submodule)"
 	cd UnivAI-exam_system && npm install
+
 	@echo "==> RAG service (UnivAI-Agent submodule)"
 	cd UnivAI-Agent && uv sync
+
 	@echo ""
 	@echo "Done. Now: make up && make dev"
 
