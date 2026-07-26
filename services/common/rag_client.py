@@ -133,13 +133,18 @@ def parse_hits(formatted: str) -> list[dict]:
     return hits
 
 
-async def search_book(query: str, top_k: int = 5) -> list[dict]:
-    """Retrieve cited passages for a student's question."""
+async def search_book(query: str, top_k: int = 5, user_id: str | None = None) -> list[dict]:
+    """Retrieve cited passages for a student's question, from THEIR namespace.
+
+    user_id is the app's tenant key (user.studentId). It scopes retrieval to
+    that one student's book. Falls back to RAG_USER_ID only when a caller has
+    not been threaded through yet (single-tenant legacy).
+    """
     formatted = await _call_tool(
         RAG_TOOL_SEARCH,
         {
             "query": query,
-            "user_id": RAG_USER_ID,
+            "user_id": user_id or RAG_USER_ID,
             "limit": top_k,
             "use_reranking": True,
         },
@@ -148,10 +153,10 @@ async def search_book(query: str, top_k: int = 5) -> list[dict]:
     return [hit for hit in hits if hit["score"] >= RAG_MIN_SCORE]
 
 
-async def ingest_file(absolute_path: str) -> str:
-    """Hand a saved book to the RAG service for indexing. It reads the path itself."""
+async def ingest_file(absolute_path: str, user_id: str | None = None) -> str:
+    """Hand a saved book to the RAG service, indexed under this student's namespace."""
     return await _call_tool(
         RAG_TOOL_INGEST,
-        {"file_path": absolute_path, "user_id": RAG_USER_ID},
+        {"file_path": absolute_path, "user_id": user_id or RAG_USER_ID},
         timeout=RAG_INGEST_TIMEOUT_S,
     )

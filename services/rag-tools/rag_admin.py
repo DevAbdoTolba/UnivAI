@@ -1,9 +1,11 @@
-"""Clear the user's knowledge base in the team's RAG service.
+"""Clear one student's knowledge base in the team's RAG service.
 
-    python services/rag-tools/rag_admin.py clear
+    python services/rag-tools/rag_admin.py clear [student_id]
 
-Used when the book is replaced: the old book's chunks must go, or the lecturer
-would keep answering questions from a book the course no longer teaches.
+Used when a student replaces their book: their old book's chunks must go, or the
+lecturer would keep answering from a book their course no longer teaches. The
+student_id scopes the wipe to that one learner's namespace (multi-tenant); omit
+it for the single-tenant fallback (RAG_USER_ID).
 Prints one line of JSON: {"ok": true, "removed": N} or {"ok": false, "error": "..."}.
 """
 
@@ -19,10 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # services/, for c
 from common.rag_client import _call_tool, RAG_USER_ID, RagUnavailable  # noqa: E402
 
 
-async def clear() -> dict:
+async def clear(user_id: str) -> dict:
     # Deleting a whole textbook's chunks takes longer than a live-lecture
     # retrieval; don't let the fail-fast default kill a working cleanup.
-    listing = await _call_tool("list_documents", {"user_id": RAG_USER_ID}, timeout=120)
+    listing = await _call_tool("list_documents", {"user_id": user_id}, timeout=120)
     if listing.startswith("No documents"):
         return {"ok": True, "removed": 0}
     if listing.startswith("Error"):
@@ -33,7 +35,7 @@ async def clear() -> dict:
     for document in documents:
         reply = await _call_tool(
             "remove_document",
-            {"user_id": RAG_USER_ID, "document_id": document["document_id"]},
+            {"user_id": user_id, "document_id": document["document_id"]},
             timeout=300,
         )
         if reply.startswith("Error"):
@@ -44,10 +46,11 @@ async def clear() -> dict:
 
 async def main() -> int:
     if len(sys.argv) < 2 or sys.argv[1] != "clear":
-        print(json.dumps({"ok": False, "error": "usage: rag_admin.py clear"}))
+        print(json.dumps({"ok": False, "error": "usage: rag_admin.py clear [student_id]"}))
         return 2
+    user_id = sys.argv[2] if len(sys.argv) > 2 else RAG_USER_ID
     try:
-        result = await clear()
+        result = await clear(user_id)
     except RagUnavailable as exc:
         result = {"ok": False, "error": str(exc)}
     except Exception as exc:  # server down, bad JSON from their tool

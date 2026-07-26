@@ -7,6 +7,9 @@ psycopg[binary]>=3.2
 python-dotenv>=1.0
 mcp>=1.2                             # MCP *client*, to call the team's RAG server
 
+# --- course generation (UnivAI-Agent/generation/lecture_gen.py runs on this venv) ---
+pypdf>=5.0                           # read the uploaded textbook PDF, page by page
+
 # --- voice-agent (live lecture) ---
 livekit-agents>=0.12
 livekit-plugins-silero>=0.7          # VAD, for barge-in detection
