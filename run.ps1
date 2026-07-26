@@ -27,12 +27,27 @@ function Say($text)  { Write-Host "==> $text" -ForegroundColor Cyan }
 function Warn($text) { Write-Host $text -ForegroundColor Yellow }
 
 function Invoke-Sql($sqlFile) {
-    Get-Content $sqlFile -Raw | docker exec -i univai-db psql -U univai -d univai | Out-Null
+    Get-Content $sqlFile -Raw | docker exec -i univai-db psql -U univai -d univai -v ON_ERROR_STOP=1 | Out-Null
+}
+
+function Invoke-SqlText($sql, $psqlArgs = @()) {
+    $sql | docker exec -i univai-db psql -U univai -d univai -v ON_ERROR_STOP=1 @psqlArgs
+}
+
+function Read-DotEnvValue($name) {
+    if (-not (Test-Path ".env")) { return "" }
+    $line = Get-Content ".env" | Where-Object { $_ -match "^\s*$([regex]::Escape($name))\s*=" } | Select-Object -Last 1
+    if (-not $line) { return "" }
+    return (($line -replace "^\s*$([regex]::Escape($name))\s*=\s*", "") -replace '^\s*["'']?|["'']?\s*$', "").Trim()
 }
 
 function Test-Url($url) {
     try { Invoke-WebRequest -Uri $url -TimeoutSec 2 -UseBasicParsing | Out-Null; return $true }
     catch { return $false }
+}
+
+function Test-TcpPort($port) {
+    return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
 }
 
 function Wait-Url($url, [int]$Seconds = 10) {
@@ -56,6 +71,11 @@ function Target-Help {
         @("up",     "Start Postgres + Qdrant, apply the schema"),
         @("down",   "Stop the containers (data is kept)"),
         @("schema", "Apply infra/schema.sql (idempotent)"),
+        @("migrate","Apply database migrations/schema"),
+        @("seed",   "Apply seed data and super-admin bootstrap"),
+        @("seed-auth","Promote SUPER_ADMIN_EMAIL if the user exists"),
+        @("rag-models","Download/preload RAG embedding models"),
+        @("rag-cache-clean","Remove broken RAG model cache"),
         @("reset",  "Wipe lectures, attendance, grades, questions; reset the clock"),
         @("rag",    "Run the team's RAG MCP server  (:8000)"),
         @("app",    "Run the Next.js app            (:$AppPort)"),
@@ -159,6 +179,40 @@ function Target-Up {
 function Target-Down   { docker @Compose down }
 function Target-Clean  { docker @Compose down -v; Warn "containers and volumes removed" }
 function Target-Schema { Invoke-Sql "infra/schema.sql"; Write-Host "schema applied" -ForegroundColor Green }
+function Target-Migrate { Target-Schema }
+function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }
+function Target-SeedAuth {
+    $email = Read-DotEnvValue "SUPER_ADMIN_EMAIL"
+    if (-not $email) {
+        Warn "SUPER_ADMIN_EMAIL is empty in .env; skipping auth seed."
+        return
+    }
+
+    $sql = @'
+UPDATE "user"
+SET
+  "role" = 'super_admin',
+  "studentId" = COALESCE(
+    "studentId",
+    'S-' || EXTRACT(YEAR FROM CURRENT_DATE)::int || '-' || LPAD(nextval('student_id_seq')::text, 6, '0')
+  ),
+  "updatedAt" = CURRENT_TIMESTAMP
+WHERE lower("email") = lower(:'admin_email')
+RETURNING "email", "role", "studentId";
+'@
+    $result = Invoke-SqlText $sql @("-v", "admin_email=$email")
+    if ($result -match "(0 rows)") {
+        Warn "No user exists yet for SUPER_ADMIN_EMAIL=$email. Sign up with that email, then rerun seed-auth."
+    } else {
+        Write-Host $result
+        Write-Host "auth seed applied" -ForegroundColor Green
+    }
+}
+function Target-Seed {
+    Target-Migrate
+    Target-SeedData
+    Target-SeedAuth
+}
 
 function Target-Reset {
     $sql = "TRUNCATE attendance, lectures, grades, qa_log RESTART IDENTITY CASCADE; UPDATE clock_state SET offset_ms = 0;"
@@ -167,6 +221,34 @@ function Target-Reset {
 }
 
 function Target-Rag    { Push-Location UnivAI-Agent; uv run python mcp_server.py; Pop-Location }
+function Target-RagModels {
+    Say "preloading RAG embedding models"
+    Push-Location UnivAI-Agent
+    try {
+        uv run python -c "from vector_store.qdrant_client import get_dense_embedder, get_sparse_embedder; print('loading dense embedder'); get_dense_embedder(); print('loading sparse embedder'); get_sparse_embedder(); print('RAG models ready')"
+    } finally {
+        Pop-Location
+    }
+}
+function Target-RagCacheClean {
+    $cacheRoot = Join-Path $env:TEMP "fastembed_cache"
+    $targets = @(
+        "models--xenova--jina-embeddings-v2-base-en",
+        "models--jinaai--jina-embeddings-v2-base-en"
+    )
+    foreach ($target in $targets) {
+        $path = Join-Path $cacheRoot $target
+        if (Test-Path $path) {
+            $resolvedCacheRoot = [System.IO.Path]::GetFullPath($cacheRoot)
+            $resolvedPath = [System.IO.Path]::GetFullPath($path)
+            if (-not $resolvedPath.StartsWith($resolvedCacheRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing to remove unexpected path: $resolvedPath"
+            }
+            Remove-Item -LiteralPath $resolvedPath -Recurse -Force
+            Write-Host "removed $resolvedPath" -ForegroundColor Yellow
+        }
+    }
+}
 function Target-App    { Push-Location UnivAI-app; npx next dev -p $AppPort; Pop-Location }
 function Target-Worker { & $Py UnivAI-live/worker.py dev }
 function Target-Slides { node scripts/build-slides.mjs }
@@ -208,7 +290,7 @@ function Target-Status {
 
     $appUp   = Test-Url "http://localhost:$AppPort/api/clock"
     $examsUp = Test-Url "http://localhost:3200"
-    $ragUp   = Test-Url "http://localhost:8000/mcp"
+    $ragUp   = Test-TcpPort 8000
     $lkUp    = Test-Url "http://127.0.0.1:7880"
     Write-Host ("app    :{0}  {1}" -f $AppPort, $(if ($appUp) { "up" } else { "down" }))
     Write-Host ("exams  :3200  {0}" -f $(if ($examsUp) { "up" } else { "down" }))
@@ -230,8 +312,14 @@ switch ($Target.ToLower()) {
     "up"     { Target-Up }
     "down"   { Target-Down }
     "schema" { Target-Schema }
+    "migrate" { Target-Migrate }
+    "seed"   { Target-Seed }
+    "seed-data" { Target-SeedData }
+    "seed-auth" { Target-SeedAuth }
     "reset"  { Target-Reset }
     "rag"    { Target-Rag }
+    "rag-models" { Target-RagModels }
+    "rag-cache-clean" { Target-RagCacheClean }
     "app"    { Target-App }
     "worker" { Target-Worker }
     "exams"  { Target-Exams }

@@ -12,23 +12,23 @@ SHELL := /bin/bash
 ifeq ($(OS),Windows_NT)
 
 POWERSHELL ?= powershell
-WIN_TARGETS := help install setup env models up down schema reset rag app worker exams slides dev status clean
-WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w
+WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth rag-models rag-cache-clean reset rag app worker exams slides dev status clean
+WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w
 
 .PHONY: $(WIN_TARGETS) $(WIN_ALIAS_TARGETS) install-node node-check
 
 help: ## Show this help
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 help
 	@echo.
-	@echo Windows aliases are also available: make up_w, make dev_w, make status_w, etc.
+	@echo Windows aliases are also available: make up_w, make dev_w, make migrate_w, make seed_w, etc.
 
-install setup env models up down schema reset rag app worker exams slides dev status clean:
+install setup env models up down schema migrate seed seed-data seed-auth rag-models rag-cache-clean reset rag app worker exams slides dev status clean:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $@
 
 install-node node-check:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 install
 
-install_w setup_w env_w models_w up_w down_w schema_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w:
+install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $(patsubst %_w,%,$@)
 
 else
@@ -48,7 +48,7 @@ PY := .venv/Scripts/python.exe
 else
 PY := .venv/bin/python
 endif
-DB       := docker exec -i univai-db psql -U univai -d univai
+DB       := docker exec -i univai-db psql -U univai -d univai -v ON_ERROR_STOP=1
 # 3100, not 3000: the exam system's "back to UnivAI" buttons point at 3100
 # (UNIVAI_APP_URL in UnivAI-exam_system/.env.local). Keep them in step.
 APP_PORT ?= 3100
@@ -67,7 +67,7 @@ export PATH := $(WINDOWS_NODE_DIR):$(PATH)
 endif
 endif
 
-.PHONY: help install install-node node-check setup env models up down schema reset rag app worker exams slides dev status clean
+.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth rag-models rag-cache-clean reset rag app worker exams slides dev status clean
 
 help: ## Show this help
 	@echo ""
@@ -266,6 +266,22 @@ down: ## Stop Postgres + Qdrant (data is kept)
 schema: ## Apply infra/schema.sql (idempotent)
 	@$(DB) < infra/schema.sql > /dev/null && echo "schema applied"
 
+migrate: schema ## Apply database migrations/schema
+
+seed: migrate seed-data seed-auth ## Apply seed data and super-admin bootstrap
+
+seed-data: ## Apply infra/seed.sql (idempotent)
+	@$(DB) < infra/seed.sql > /dev/null && echo "seed data applied"
+
+seed-auth: ## Promote SUPER_ADMIN_EMAIL to super_admin if that user exists
+	@email="$$(awk -F= '/^[[:space:]]*SUPER_ADMIN_EMAIL[[:space:]]*=/{gsub(/^[[:space:]]+|[[:space:]]+$$/, "", $$2); gsub(/^["'\'']|["'\'']$$/, "", $$2); value=$$2} END{print value}' .env 2>/dev/null)"; \
+	if [ -z "$$email" ]; then \
+		echo "SUPER_ADMIN_EMAIL is empty in .env; skipping auth seed."; \
+	else \
+		echo "==> promoting $$email if it exists"; \
+		printf '%s\n' 'UPDATE "user" SET "role" = '\''super_admin'\'', "studentId" = COALESCE("studentId", '\''S-'\'' || EXTRACT(YEAR FROM CURRENT_DATE)::int || '\''-'\'' || LPAD(nextval('\''student_id_seq'\'')::text, 6, '\''0'\'')), "updatedAt" = CURRENT_TIMESTAMP WHERE lower("email") = lower(:'\''admin_email'\'') RETURNING "email", "role", "studentId";' | $(DB) -v admin_email="$$email"; \
+	fi
+
 reset: ## Wipe lectures, attendance, grades, Q&A and reset the virtual clock
 	@$(DB) -c "TRUNCATE attendance, lectures, grades, qa_log RESTART IDENTITY CASCADE; UPDATE clock_state SET offset_ms = 0;" > /dev/null
 	@echo "data cleared, virtual clock back to real time"
@@ -286,6 +302,14 @@ exams: ## Run the exam system (UnivAI-exam_system) - :3200
 
 slides: ## Build the Slidev decks to UnivAI-app/public/slides/
 	node scripts/build-slides.mjs
+
+rag-models: ## Download/preload RAG embedding models
+	cd UnivAI-Agent && uv run python -c "from vector_store.qdrant_client import get_dense_embedder, get_sparse_embedder; print('loading dense embedder'); get_dense_embedder(); print('loading sparse embedder'); get_sparse_embedder(); print('RAG models ready')"
+
+rag-cache-clean: ## Remove broken RAG Jina embedding model cache
+	@cache="$${TMPDIR:-/tmp}/fastembed_cache"; \
+	rm -rf "$$cache/models--xenova--jina-embeddings-v2-base-en" "$$cache/models--jinaai--jina-embeddings-v2-base-en"; \
+	echo "removed broken RAG model cache under $$cache"
 
 # ---------------------------------------------------------------- everything at once
 
