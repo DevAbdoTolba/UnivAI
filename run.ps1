@@ -35,6 +35,15 @@ function Test-Url($url) {
     catch { return $false }
 }
 
+function Wait-Url($url, [int]$Seconds = 10) {
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Url $url) { return $true }
+        Start-Sleep -Milliseconds 500
+    }
+    return $false
+}
+
 function Target-Help {
     Write-Host ""
     Write-Host "  UnivAI - targets" -ForegroundColor White
@@ -167,7 +176,18 @@ function Target-Dev {
     Target-Up
     if (-not (Test-Url "http://127.0.0.1:11434")) {
         Say "waking Ollama"
-        ollama list | Out-Null
+        $ollama = Get-Command ollama -ErrorAction SilentlyContinue
+        if ($ollama) {
+            $proc = Start-Process -FilePath $ollama.Source -ArgumentList "list" -WindowStyle Hidden -PassThru
+            if (-not $proc.WaitForExit(5000)) {
+                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            }
+            if (-not (Wait-Url "http://127.0.0.1:11434" 10)) {
+                Warn "WARNING: Ollama did not answer on :11434 within 10 seconds; continuing anyway."
+            }
+        } else {
+            Warn "WARNING: Ollama is not installed or not on PATH; continuing without waking it."
+        }
     }
     Say "launching RAG, app and worker in separate windows"
     $root = $PSScriptRoot

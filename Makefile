@@ -9,6 +9,30 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
+ifeq ($(OS),Windows_NT)
+
+POWERSHELL ?= powershell
+WIN_TARGETS := help install setup env models up down schema reset rag app worker exams slides dev status clean
+WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w
+
+.PHONY: $(WIN_TARGETS) $(WIN_ALIAS_TARGETS) install-node node-check
+
+help: ## Show this help
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 help
+	@echo.
+	@echo Windows aliases are also available: make up_w, make dev_w, make status_w, etc.
+
+install setup env models up down schema reset rag app worker exams slides dev status clean:
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $@
+
+install-node node-check:
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 install
+
+install_w setup_w env_w models_w up_w down_w schema_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w:
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $(patsubst %_w,%,$@)
+
+else
+
 COMPOSE  := docker compose -f infra/docker-compose.yml
 # SYSPY: whatever python the machine has (ubuntu ships python3 only, some
 # windows only the py launcher). Its single job is creating the venv;
@@ -299,3 +323,5 @@ status: ## Show what is running
 clean: ## Remove containers AND their volumes. Destroys the database and the vectors
 	$(COMPOSE) down -v
 	@echo "containers and volumes removed"
+
+endif
