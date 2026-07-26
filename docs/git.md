@@ -1,43 +1,27 @@
 # git
 
-## first time
+## clone
+
+Clone each repository independently and use its tracked branch:
 
 ```sh
-git clone --recurse-submodules https://github.com/DevAbdoTolba/UnivAI
-```
-
-forgot the flag?
-
-```sh
-git submodule update --init --recursive
+git clone https://github.com/DevAbdoTolba/UnivAI
+git clone https://github.com/abdalrahmanalirajab/UnivAI-app
+git clone --branch temp https://github.com/AhmeedFatehy/UnivAI-Agent
+git clone https://github.com/muhameedhanyyy/UnivAI-live
+git clone https://github.com/AhmedSamirKhalaf/UnivAI-exam_system
 ```
 
 ## update
 
-```sh
-git pull
-git submodule update --init --recursive
-```
-
-## a submodule got new commits
+Run this inside each repository:
 
 ```sh
-git submodule update --remote UnivAI-Agent
-git add UnivAI-Agent
-git commit -m "bump UnivAI-Agent"
-git push
+git pull --ff-only
 ```
 
-everyone else: see **update**.
+Tracked branches: `UnivAI-Agent` uses `temp`; every other repository uses
+`main`.
 
-## work inside a submodule
-
-```sh
-cd UnivAI-Agent
-git checkout temp        # submodules land detached — pick the branch first
-# ...commit, push as normal...
-cd ..
-git add UnivAI-Agent && git commit -m "bump UnivAI-Agent" && git push
-```
-
-branches: `UnivAI-Agent` → `temp`, everything else → `main`.
+Core does not initialise or update the other repositories. Each repository
+builds, tests, and ships independently.

@@ -210,9 +210,6 @@ endif
 setup: env ## Install everything: node deps, python venv, exam deps, RAG deps
 	@$(MAKE) --no-print-directory node-check
 
-	@echo "==> submodules"
-	git submodule update --init --recursive
-
 	@echo "==> app dependencies (UnivAI-app submodule)"
 	cd UnivAI-app && npm install
 

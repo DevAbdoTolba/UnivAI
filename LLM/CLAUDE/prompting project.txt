@@ -1451,7 +1451,7 @@ demo" completed (exit code 0)
       39    $(PIP) install -r services/requirements.txt
       40 -  @echo "==> RAG service (UnivAI-Agent submodule)"             
       40 +  @echo "==> submodules"                                       
-      41    git submodule update --init --recursive
+      41    [historical recursive checkout removed]
       42 +  @echo "==> exam system (UnivAI-exam_system submodule)"       
       43 +  cd UnivAI-exam_system && npm install                         
       44 +  @echo "==> RAG service (UnivAI-Agent submodule)"             
@@ -1561,7 +1561,7 @@ demo" completed (exit code 0)
       80  
       81 -    Say "RAG service (UnivAI-Agent submodule)"                 
       81 +    Say "submodules"                                           
-      82      git submodule update --init --recursive
+      82      [historical recursive checkout removed]
       83 +                                                               
       84 +    Say "exam system (UnivAI-exam_system submodule)"           
       85 +    Push-Location UnivAI-exam_system; npm install; Pop-Location
@@ -3767,8 +3767,8 @@ code 0)
 
   That was the last loose end. All five repos are now fully consistent and
   public: the live cave holds the voice class, main's submodule pointers all
-  reference commits that exist on their remotes, so a fresh git clone 
-  --recurse-submodules brings up the complete campus. Zero assistant traces,
+  reference commits that exist on their remotes. Repositories are cloned
+  independently. Zero assistant traces,
   zero double-avatar commits, every commit owned by exactly one real teammate.
 
 ✻ Churned for 40s
@@ -4910,9 +4910,8 @@ reference" completed (exit code 0)
   Remote tip: de3d20b
   Status: pulled, current
 
-  The campus's submodule pointers all reference commits that exist on the 
-  remotes — a fresh git clone --recurse-submodules gets the complete working
-  campus.
+  The campus's repositories are cloned and updated independently from their
+  tracked branches.
 
   Two tiny notes: the ? marker on UnivAI-live is just an untracked ظظ.zip file
   you dropped in there (yours, left alone); and remote research-models
