@@ -12,8 +12,8 @@ SHELL := /bin/bash
 ifeq ($(OS),Windows_NT)
 
 POWERSHELL ?= powershell
-WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth rag-models rag-cache-clean reset rag app worker exams slides dev status clean
-WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w
+WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag app worker exams slides dev dev-integration status clean
+WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w
 
 .PHONY: $(WIN_TARGETS) $(WIN_ALIAS_TARGETS) install-node node-check
 
@@ -22,13 +22,13 @@ help: ## Show this help
 	@echo.
 	@echo Windows aliases are also available: make up_w, make dev_w, make migrate_w, make seed_w, etc.
 
-install setup env models up down schema migrate seed seed-data seed-auth rag-models rag-cache-clean reset rag app worker exams slides dev status clean:
+install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag app worker exams slides dev dev-integration status clean:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $@
 
 install-node node-check:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 install
 
-install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w status_w clean_w:
+install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $(patsubst %_w,%,$@)
 
 else
@@ -67,7 +67,7 @@ export PATH := $(WINDOWS_NODE_DIR):$(PATH)
 endif
 endif
 
-.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth rag-models rag-cache-clean reset rag app worker exams slides dev status clean
+.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag app worker exams slides dev dev-integration status clean
 
 help: ## Show this help
 	@echo ""
@@ -270,6 +270,20 @@ migrate: schema ## Apply database migrations/schema
 
 seed: migrate seed-data seed-auth ## Apply seed data and super-admin bootstrap
 
+seed-demo: migrate ## Apply the deterministic integration-demo scenario
+	@$(DB) < infra/demo-seed.sql > /dev/null && echo "integration demo seed applied"
+	npm --prefix UnivAI-app run seed:integration
+	npm --prefix UnivAI-exam_system run seed:integration
+
+submodules-check: ## Verify pinned submodule SHAs and clean working trees
+	node scripts/submodules-check.mjs
+
+contract-check: ## Validate cross-repository contracts and canonical fixtures
+	node scripts/contract-check.mjs
+
+integration-smoke: ## Run bounded static and live integration checkpoints
+	node scripts/integration-smoke.mjs
+
 seed-data: ## Apply infra/seed.sql (idempotent)
 	@$(DB) < infra/seed.sql > /dev/null && echo "seed data applied"
 
@@ -335,6 +349,8 @@ endif
 	@echo ""
 	@echo "  Ollama wakes automatically on Windows. The course generator and"
 	@echo "  lecture Q&A call it at :11434 (gemma3:1b - one light model, no fallback)."
+
+dev-integration: dev ## Explicit alias for the full real local integration stack
 
 status: ## Show what is running
 	@echo "containers:" && docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"

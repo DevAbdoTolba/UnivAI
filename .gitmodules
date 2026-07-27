@@ -9,7 +9,7 @@
 [submodule "UnivAI-Agent"]
 	path = UnivAI-Agent
 	url = https://github.com/AhmeedFatehy/UnivAI-Agent
-	branch = temp
+	branch = main
 [submodule "UnivAI-live"]
 	path = UnivAI-live
 	url = https://github.com/muhameedhanyyy/UnivAI-live

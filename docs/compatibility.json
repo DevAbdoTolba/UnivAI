@@ -1,0 +1,35 @@
+{
+  "recordedAt": "2026-07-27",
+  "main": {
+    "branch": "main",
+    "startingCommit": "0a1892f4300ec7085ff804e6f276f52633381642"
+  },
+  "submodules": {
+    "UnivAI-Agent": {
+      "branchHint": "main",
+      "recordedCommit": "2f9f8a236b16235a07317b30faafd7f3705d8480"
+    },
+    "UnivAI-app": {
+      "branchHint": "main",
+      "recordedCommit": "17b0c65db8ea1e8dcd7f841293598fd0304bb762"
+    },
+    "UnivAI-exam_system": {
+      "branchHint": "main",
+      "recordedCommit": "3218c1e72f324160ee1e9750b48cdc8824e074cc"
+    },
+    "UnivAI-live": {
+      "branchHint": "main",
+      "recordedCommit": "a1efd2af4743dd1178d2d007d2051b6f791dfd0b"
+    }
+  },
+  "ports": {
+    "app": 3100,
+    "exam": 3200,
+    "agentMcp": 8000,
+    "livekit": 7880,
+    "postgres": 5433,
+    "qdrant": 6333,
+    "mongo": 27017
+  },
+  "note": "Working-tree standalone implementations must be reviewed and merged in their owner repositories before these gitlinks can be updated."
+}

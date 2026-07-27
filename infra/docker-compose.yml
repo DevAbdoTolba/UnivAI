@@ -21,7 +21,7 @@ services:
   # The team's RAG service (UnivAI-Agent submodule) stores its vectors here.
   # This app never touches it — it only calls RAG's MCP server.
   qdrant:
-    image: qdrant/qdrant
+    image: qdrant/qdrant:v1.18.2
     container_name: univai-qdrant
     restart: unless-stopped
     ports:
@@ -29,12 +29,21 @@ services:
       - "6334:6334"
     volumes:
       - univai-qdrant:/qdrant/storage
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333; printf \"GET /healthz HTTP/1.0\\r\\n\\r\\n\" >&3; grep -q \"200 OK\" <&3'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   # Local LiveKit server so the live lecture never depends on internet weather.
   # --dev bakes in the devkey/secret pair; --node-ip keeps ICE candidates on
   # localhost (for a two-machine LAN demo, set it to this machine's LAN IP).
   livekit:
-    image: livekit/livekit-server:latest
+    image: livekit/livekit-server:v1.13.1
     container_name: univai-livekit
     restart: unless-stopped
     command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
@@ -42,6 +51,11 @@ services:
       - "7880:7880"       # signaling (ws / http)
       - "7881:7881"       # ICE over TCP
       - "7882:7882/udp"   # media (UDP mux)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7880"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   # Exam storage for the UnivAI-exam_system submodule (local for now).
   mongo:
@@ -52,6 +66,11 @@ services:
       - "27017:27017"
     volumes:
       - univai-mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   univai-pgdata:

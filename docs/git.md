@@ -40,4 +40,4 @@ cd ..
 git add UnivAI-Agent && git commit -m "bump UnivAI-Agent" && git push
 ```
 
-branches: `UnivAI-Agent` → `temp`, everything else → `main`.
+branches: all four submodules → `main`.
