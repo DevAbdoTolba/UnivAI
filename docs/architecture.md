@@ -35,6 +35,16 @@ Six processes, three containers, one virtual clock.
     └── webhook: score + proctoring report → grades table → /dashboard, /exams, /admin
 ```
 
+## MVP-2 programme planning boundary
+
+A learner's one-or-many uploaded books form a versioned SourceCollection.
+Ingestion completes per document before Core accepts a schema-validated,
+source-grounded ProgrammePlan. Plan edits create new versions; approval names
+the exact latest version and makes it immutable. A tracked generation job then
+moves through `queued -> ingesting -> planning -> awaiting_approval ->
+generating -> ready`. See `docs/contracts/final-mvp-contracts.md` for the
+versioned fields, API boundaries, fixtures, idempotency and error contract.
+
 ## Rules the code lives by
 
 - **The virtual clock is law.** Nothing reads the wall clock except
