@@ -3,7 +3,11 @@
   "private": true,
   "description": "Repo-level tooling. The web app lives in the UnivAI-app submodule.",
   "scripts": {
-    "slides": "node scripts/build-slides.mjs"
+    "slides": "node scripts/build-slides.mjs",
+    "submodules:check": "node scripts/submodules-check.mjs",
+    "contracts:check": "node scripts/contract-check.mjs",
+    "integration:smoke": "node scripts/integration-smoke.mjs",
+    "test": "node --test scripts/tests/*.test.mjs"
   },
   "devDependencies": {
     "@slidev/cli": "^52.0.0",

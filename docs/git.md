@@ -20,8 +20,6 @@ Run this inside each repository:
 git pull --ff-only
 ```
 
-Tracked branches: `UnivAI-Agent` uses `temp`; every other repository uses
-`main`.
-
 Core does not initialise or update the other repositories. Each repository
 builds, tests, and ships independently.
+branches: all four submodules → `main`.

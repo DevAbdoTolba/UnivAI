@@ -1,5 +1,10 @@
 # UnivAI — "Jamieh" 🎓
 
+Standalone development and full integration use different explicit commands.
+See [docs/integration-development.md](docs/integration-development.md) for
+clean-clone setup, deterministic seed/smoke commands, provider requirements,
+production guards, and the required Git submodule pointer workflow.
+
 **Upload a textbook. Get a university.**
 
 One PDF goes in. Out comes a living four-week semester:

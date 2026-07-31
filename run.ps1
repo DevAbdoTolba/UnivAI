@@ -73,6 +73,10 @@ function Target-Help {
         @("schema", "Apply infra/schema.sql (idempotent)"),
         @("migrate","Apply database migrations/schema"),
         @("seed",   "Apply seed data and super-admin bootstrap"),
+        @("seed-demo","Apply deterministic integration-demo records"),
+        @("submodules-check","Verify pinned submodule SHAs and clean state"),
+        @("contract-check","Validate cross-repository contracts"),
+        @("integration-smoke","Run bounded integration checkpoints"),
         @("seed-auth","Promote SUPER_ADMIN_EMAIL if the user exists"),
         @("rag-models","Download/preload RAG embedding models"),
         @("rag-cache-clean","Remove broken RAG model cache"),
@@ -83,6 +87,7 @@ function Target-Help {
         @("exams",  "Run the exam system (:3200)"),
         @("slides", "Build the Slidev decks to UnivAI-app/public/slides/"),
         @("dev",    "Start infra, then RAG + app + worker in separate windows"),
+        @("dev-integration","Explicit full integrated-stack alias"),
         @("status", "Show what is running"),
         @("clean",  "Remove containers AND volumes (destroys the DB and the vectors)")
     )
@@ -210,6 +215,18 @@ function Target-Seed {
     Target-SeedData
     Target-SeedAuth
 }
+function Target-SeedDemo {
+    Target-Migrate
+    Invoke-Sql "infra/demo-seed.sql"
+    npm --prefix UnivAI-app run seed:integration
+    if ($LASTEXITCODE -ne 0) { throw "App integration seed failed" }
+    npm --prefix UnivAI-exam_system run seed:integration
+    if ($LASTEXITCODE -ne 0) { throw "Exam integration seed failed" }
+    Write-Host "integration demo seed applied" -ForegroundColor Green
+}
+function Target-SubmodulesCheck { node scripts/submodules-check.mjs }
+function Target-ContractCheck { node scripts/contract-check.mjs }
+function Target-IntegrationSmoke { node scripts/integration-smoke.mjs }
 
 function Target-Reset {
     $sql = "TRUNCATE attendance, lectures, grades, qa_log RESTART IDENTITY CASCADE; UPDATE clock_state SET offset_ms = 0;"
@@ -313,6 +330,10 @@ switch ($Target.ToLower()) {
     "seed"   { Target-Seed }
     "seed-data" { Target-SeedData }
     "seed-auth" { Target-SeedAuth }
+    "seed-demo" { Target-SeedDemo }
+    "submodules-check" { Target-SubmodulesCheck }
+    "contract-check" { Target-ContractCheck }
+    "integration-smoke" { Target-IntegrationSmoke }
     "reset"  { Target-Reset }
     "rag"    { Target-Rag }
     "rag-models" { Target-RagModels }
@@ -322,6 +343,7 @@ switch ($Target.ToLower()) {
     "exams"  { Target-Exams }
     "slides" { Target-Slides }
     "dev"    { Target-Dev }
+    "dev-integration" { Target-Dev }
     "status" { Target-Status }
     "clean"  { Target-Clean }
     default  { Warn "Unknown target '$Target'"; Target-Help; exit 1 }
