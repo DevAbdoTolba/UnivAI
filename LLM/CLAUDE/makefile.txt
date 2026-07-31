@@ -32,8 +32,8 @@
 
   setup fetch all code. No extra steps.
 
-  One-command way also exist: git clone --recurse-submodules ... — but not
-  needed, setup covers it.
+  Historical recursive checkout advice removed. Repositories are now cloned
+  and validated independently.
 
   Two small warnings for tribe:
 
@@ -45,27 +45,24 @@
 
 ✻ Churned for 42s
 
-❯ git submodule update --init --recursive so this command gets them all?        
+❯ Can one command get every repository?
   what about to whom who has the project already and requires to just update    
   things on his machine?                                                        
   the same?                                                                     
 
 ● Yes and yes.
 
-  Fresh machine: git submodule update --init --recursive clones all four, at
-  exact commits root repo points at.
+  Historical answer removed: repositories are now cloned independently from
+  their tracked branches.
 
   Already-have machine: same command, two-step dance:
 
   git pull
-  git submodule update --init --recursive
 
   - git pull bring new root code + new submodule pointers.
-  - git submodule update --init --recursive move submodules to match pointers.
-  --init harmless when already done — only kicks in if tribe added brand-new
-  submodule. So always run same command, no thinking needed.
+  - Update each repository independently.
 
-  One-liner also exist: git pull --recurse-submodules — does both.
+  Recursive checkout is no longer part of the repository workflow.
 
   Important cave law: this syncs submodules to commit root repo recorded, not to
   latest on teammate's branch. Teammate pushed fresh UnivAI-Agent code? Root
@@ -94,7 +91,7 @@
       3 ## first time
       4 
       5 ```sh
-      6 git clone --recurse-submodules https://github.com/DevAbdoTolba/Un
+      6 git clone https://github.com/DevAbdoTolba/Un
         ivAI
       7 ```
       8 
@@ -103,7 +100,7 @@
 
 ● Done. UnivAI/docs/git.md — four stones, no fluff:
 
-  1. first time — clone with --recurse-submodules
+  1. first time — clone each repository independently
   2. update — pull + submodule update
   3. bump submodule pointer — when teammate pushed new code
   4. work inside submodule — checkout branch first, detached-HEAD trap named
@@ -208,7 +205,7 @@
       63 +  $(PY) -m pip install --upgrade pip                           
       64 +  $(PY) -m pip install -r services/requirements.txt            
       65    @echo "==> submodules"
-      66    git submodule update --init --recursive
+      66    [historical recursive checkout removed]
       67    @echo "==> exam system (UnivAI-exam_system submodule)"
 
   Searched for 1 pattern, ran 2 shell commands (ctrl+o to expand)

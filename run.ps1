@@ -159,9 +159,6 @@ function Target-Setup {
     & $Pip install --upgrade pip
     & $Pip install -r services/requirements.txt
 
-    Say "submodules"
-    git submodule update --init --recursive
-
     Say "exam system (UnivAI-exam_system submodule)"
     Push-Location UnivAI-exam_system; npm install; Pop-Location
 
