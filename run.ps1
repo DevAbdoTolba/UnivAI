@@ -69,7 +69,7 @@ function Target-Help {
         @("env",    "Create .env from .env.example if missing"),
         @("models", "Download the voice models + the one local LLM (gemma3:1b)"),
         @("up",     "Start Postgres + Qdrant, apply the schema"),
-        @("down",   "Stop the containers (data is kept)"),
+        @("down",   "Stop the containers and the RAG server (data is kept)"),
         @("schema", "Apply infra/schema.sql (idempotent)"),
         @("migrate","Apply database migrations/schema"),
         @("seed",   "Apply seed data and super-admin bootstrap"),
@@ -81,7 +81,10 @@ function Target-Help {
         @("rag-models","Download/preload RAG embedding models"),
         @("rag-cache-clean","Remove broken RAG model cache"),
         @("reset",  "Wipe lectures, attendance, grades, questions; reset the clock"),
-        @("rag",    "Run the team's RAG MCP server  (:8000)"),
+        @("rag",    "Start the whole RAG stack - Qdrant + MCP, in the background"),
+        @("rag-db", "Start just the Qdrant vector database (:6333)"),
+        @("rag-down","Stop the RAG MCP server and the Qdrant container"),
+        @("rag-logs","Follow the background RAG MCP server log"),
         @("app",    "Run the Next.js app            (:$AppPort)"),
         @("worker", "Run the live-lecture voice agent (needs LIVEKIT_* keys)"),
         @("exams",  "Run the exam system (:3200)"),
@@ -178,8 +181,10 @@ function Target-Up {
     Write-Host "Postgres :5433   Qdrant :6333   Mongo :27017   LiveKit :7880" -ForegroundColor Green
 }
 
-function Target-Down   { docker @Compose down }
-function Target-Clean  { docker @Compose down -v; Warn "containers and volumes removed" }
+# Both stop the RAG server first: it is detached, so taking its Qdrant away
+# without stopping it leaves it answering :8000 against a store that is gone.
+function Target-Down   { Target-RagStop; docker @Compose down }
+function Target-Clean  { Target-RagStop; docker @Compose down -v; Warn "containers and volumes removed" }
 function Target-Schema { Invoke-Sql "infra/schema.sql"; Write-Host "schema applied" -ForegroundColor Green }
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }
@@ -234,7 +239,175 @@ function Target-Reset {
     Write-Host "data cleared, virtual clock back to real time" -ForegroundColor Green
 }
 
-function Target-Rag    { Push-Location UnivAI-Agent; uv run python mcp_server.py; Pop-Location }
+# ---- RAG stack (UnivAI-Agent submodule + its Qdrant vector database) ----
+# logs/ is gitignored, so the log and the pid handle stay out of git.
+$RagPort    = 8000
+$RagMcp     = "http://localhost:$RagPort/mcp"
+# Probed over 127.0.0.1, not localhost: the server binds IPv4 only, and a
+# localhost lookup that answers ::1 first wastes the timeout before falling back.
+$RagProbe   = "http://127.0.0.1:$RagPort/mcp"
+$QdrantUrl  = "http://localhost:6333"
+$RagLog     = "logs/rag-mcp.log"
+$RagOutLog  = "logs/rag-mcp.out.log"
+$RagPidFile = "logs/rag-mcp.pid"
+$RagDirectory = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "UnivAI-Agent"))
+$RagScript    = Join-Path $RagDirectory "mcp_server.py"
+
+function Test-QdrantReady {
+    return (Test-Url "$QdrantUrl/readyz") -or (Test-Url "$QdrantUrl/collections")
+}
+
+# FastMCP returns HTTP 406 to a plain GET without the MCP Accept headers. That
+# still proves the endpoint is answering, just as curl without -f does in the
+# Makefile. Network failures have no response and remain false.
+function Test-RagEndpoint {
+    try {
+        Invoke-WebRequest -Uri $RagProbe -TimeoutSec 2 -UseBasicParsing | Out-Null
+        return $true
+    } catch {
+        return $null -ne $_.Exception.Response
+    }
+}
+
+function Target-RagDb {
+    docker @Compose up -d qdrant
+    if ($LASTEXITCODE -ne 0) { throw "Could not start the Qdrant container" }
+    Say "waiting for Qdrant on $QdrantUrl"
+    $deadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-QdrantReady) { Write-Host "Qdrant ready" -ForegroundColor Green; return }
+        Start-Sleep -Milliseconds 500
+    }
+    throw "Qdrant did not become ready within 60s. Check: docker logs univai-qdrant"
+}
+
+# $Wait = 0 starts the server and returns immediately (what `dev` does).
+function Target-Rag([int]$Wait = 300) {
+    Target-RagDb
+    if (Test-RagEndpoint) {
+        if (Get-RagListenerProcess) {
+            Write-Host "RAG MCP server is already answering on :$RagPort" -ForegroundColor Green
+            return
+        }
+        throw ("Something is already listening on :$RagPort, but it is not the RAG " +
+               "MCP server. Free the port before starting RAG.")
+    }
+    if (-not (Test-Path "UnivAI-Agent/.venv")) {
+        throw "UnivAI-Agent/.venv is missing. Run: ./run.ps1 setup"
+    }
+
+    New-Item -ItemType Directory -Force -Path "logs" | Out-Null
+    Say "starting the RAG MCP server (log: $RagLog)"
+    # FastMCP reads its bind address from the environment; Start-Process inherits it.
+    $env:FASTMCP_HOST = "127.0.0.1"
+    $env:FASTMCP_PORT = "$RagPort"
+    $ragArguments = @("run", "python", "`"$RagScript`"")
+    $proc = Start-Process -FilePath "uv" `
+        -ArgumentList $ragArguments `
+        -WorkingDirectory $RagDirectory `
+        -RedirectStandardOutput $RagOutLog `
+        -RedirectStandardError $RagLog `
+        -WindowStyle Hidden -PassThru
+    $proc.Id | Set-Content $RagPidFile
+
+    if ($Wait -le 0) {
+        Write-Host "starting in the background - follow it with: ./run.ps1 rag-logs" -ForegroundColor DarkGray
+        return
+    }
+
+    Say "waiting for :$RagPort (the first run downloads the embedding and reranker"
+    Say "models, so this can take minutes - ./run.ps1 rag-logs to watch)"
+    $deadline = (Get-Date).AddSeconds($Wait)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-RagEndpoint) {
+            Write-Host ""
+            Write-Host "  RAG MCP  $RagMcp"        -ForegroundColor Green
+            Write-Host "  Qdrant   $QdrantUrl"     -ForegroundColor Green
+            Write-Host "  log      $RagLog      stop with: ./run.ps1 rag-down"
+            Write-Host ""
+            return
+        }
+        if ($proc.HasExited) {
+            Write-Host "The MCP server exited during startup. Last 20 log lines:" -ForegroundColor Red
+            foreach ($file in @($RagLog, $RagOutLog)) {
+                if (Test-Path $file) { Get-Content $file -Tail 20 }
+            }
+            Remove-Item $RagPidFile -ErrorAction SilentlyContinue
+            throw "RAG MCP server failed to start"
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw ":$RagPort did not answer within ${Wait}s. It may still be loading models - check: ./run.ps1 rag-logs"
+}
+
+# Stops the MCP server by its recorded pid, then sweeps any stray process still
+# running mcp_server.py - `dev` and a hand-started server can both leave one
+# behind, and a half-dead server holding :8000 is worse than none.
+function Get-RagProcess {
+    $listenerIds = @(
+        Get-NetTCPConnection -LocalPort $RagPort -State Listen -ErrorAction SilentlyContinue |
+            ForEach-Object { [int]$_.OwningProcess }
+    )
+    $scriptPattern = [regex]::Escape($RagScript)
+    return Get-CimInstance Win32_Process -Filter "Name = 'python.exe' OR Name = 'uv.exe'" -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.CommandLine -and (
+                $_.CommandLine -match $scriptPattern -or
+                ($listenerIds -contains [int]$_.ProcessId -and $_.CommandLine -match 'mcp_server\.py')
+            )
+        }
+}
+
+function Get-RagListenerProcess {
+    $listenerIds = @(
+        Get-NetTCPConnection -LocalPort $RagPort -State Listen -ErrorAction SilentlyContinue |
+            ForEach-Object { [int]$_.OwningProcess }
+    )
+    return Get-RagProcess | Where-Object { $listenerIds -contains [int]$_.ProcessId }
+}
+
+# Stop just the MCP server process (no containers). Shared by rag-down, down and
+# clean: the server runs detached now, so anything that takes its Qdrant away has
+# to stop it too, or it survives answering :8000 against a store that is gone.
+function Target-RagStop {
+    if (Test-Path $RagPidFile) {
+        $pidValue = (Get-Content $RagPidFile -Raw).Trim()
+        if ($pidValue) {
+            $existing = Get-RagProcess | Where-Object { [int]$_.ProcessId -eq [int]$pidValue }
+            if ($existing) {
+                Stop-Process -Id $pidValue -Force -ErrorAction SilentlyContinue
+                Write-Host "stopped the RAG MCP server (pid $pidValue)" -ForegroundColor Yellow
+            } else {
+                Write-Host "ignored stale RAG pid file (pid $pidValue is not owned by this checkout)" -ForegroundColor DarkGray
+            }
+        }
+        Remove-Item $RagPidFile -ErrorAction SilentlyContinue
+    }
+
+    foreach ($stray in Get-RagProcess) {
+        Stop-Process -Id $stray.ProcessId -Force -ErrorAction SilentlyContinue
+        Write-Host "stopped a stray mcp_server.py process (pid $($stray.ProcessId))" -ForegroundColor Yellow
+    }
+
+    $deadline = (Get-Date).AddSeconds(10)
+    while ((Get-Date) -lt $deadline -and (Test-RagEndpoint)) { Start-Sleep -Milliseconds 500 }
+    if (Test-RagEndpoint) { Warn "WARNING: :$RagPort is still answering." }
+}
+
+function Target-RagDown {
+    Target-RagStop
+    docker @Compose rm -sf qdrant | Out-Null
+    Write-Host "stopped and removed the univai-qdrant container" -ForegroundColor Yellow
+    Write-Host "vectors are kept in the univai-qdrant volume - './run.ps1 clean' destroys them" -ForegroundColor DarkGray
+}
+
+function Target-RagLogs {
+    $logs = @($RagLog, $RagOutLog) | Where-Object { Test-Path $_ }
+    if (-not $logs) {
+        throw "no log yet at $RagLog - start it with: ./run.ps1 rag"
+    }
+    Get-Content -Path $logs -Tail 50 -Wait
+}
 function Target-RagModels {
     Say "preloading RAG embedding models"
     Push-Location UnivAI-Agent
@@ -287,7 +460,8 @@ function Target-Dev {
     }
     Say "launching RAG, app and worker in separate windows"
     $root = $PSScriptRoot
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 rag"
+    # RAG detaches itself and logs to a file, so it needs no window and no wait.
+    Target-Rag -Wait 0
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort"
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 worker"
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams"
@@ -295,7 +469,9 @@ function Target-Dev {
     Write-Host ""
     Write-Host "  app    http://localhost:$AppPort"           -ForegroundColor Green
     Write-Host "  admin  http://localhost:$AppPort/admin   (move the virtual clock here)"
-    Write-Host "  RAG    http://localhost:8000/mcp"
+    Write-Host "  RAG    $RagMcp"
+    Write-Host ""
+    Write-Host "  RAG runs detached - './run.ps1 rag-logs' to watch it, './run.ps1 rag-down' to stop it." -ForegroundColor DarkGray
 }
 
 function Target-Status {
@@ -304,11 +480,13 @@ function Target-Status {
 
     $appUp   = Test-Url "http://localhost:$AppPort/api/clock"
     $examsUp = Test-Url "http://localhost:3200"
-    $ragUp   = Test-TcpPort 8000
+    $ragUp   = Test-TcpPort $RagPort
+    $qdrantUp = Test-QdrantReady
     $lkUp    = Test-Url "http://127.0.0.1:7880"
     Write-Host ("app    :{0}  {1}" -f $AppPort, $(if ($appUp) { "up" } else { "down" }))
     Write-Host ("exams  :3200  {0}" -f $(if ($examsUp) { "up" } else { "down" }))
-    Write-Host ("RAG    :8000  {0}"  -f $(if ($ragUp) { "up" } else { "down" }))
+    Write-Host ("RAG    :{0}  {1}"  -f $RagPort, $(if ($ragUp) { "up" } else { "down" }))
+    Write-Host ("qdrant :6333  {0}"  -f $(if ($qdrantUp) { "up" } else { "down" }))
     Write-Host ("livekit:7880  {0}"  -f $(if ($lkUp) { "up" } else { "down" }))
 
     if ($appUp) {
@@ -336,6 +514,10 @@ switch ($Target.ToLower()) {
     "integration-smoke" { Target-IntegrationSmoke }
     "reset"  { Target-Reset }
     "rag"    { Target-Rag }
+    "rag-db" { Target-RagDb }
+    "rag-down" { Target-RagDown }
+    "rag-stop" { Target-RagStop }
+    "rag-logs" { Target-RagLogs }
     "rag-models" { Target-RagModels }
     "rag-cache-clean" { Target-RagCacheClean }
     "app"    { Target-App }

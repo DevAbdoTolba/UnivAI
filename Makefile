@@ -12,8 +12,8 @@ SHELL := /bin/bash
 ifeq ($(OS),Windows_NT)
 
 POWERSHELL ?= powershell
-WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag app worker exams slides dev dev-integration status clean
-WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w
+WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean
+WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w
 
 .PHONY: $(WIN_TARGETS) $(WIN_ALIAS_TARGETS) install-node node-check
 
@@ -22,13 +22,13 @@ help: ## Show this help
 	@echo.
 	@echo Windows aliases are also available: make up_w, make dev_w, make migrate_w, make seed_w, etc.
 
-install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag app worker exams slides dev dev-integration status clean:
+install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $@
 
 install-node node-check:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 install
 
-install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w:
+install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $(patsubst %_w,%,$@)
 
 else
@@ -53,6 +53,32 @@ DB       := docker exec -i univai-db psql -U univai -d univai -v ON_ERROR_STOP=1
 # (UNIVAI_APP_URL in UnivAI-exam_system/.env.local). Keep them in step.
 APP_PORT ?= 3100
 
+# ---- RAG stack (UnivAI-Agent submodule + its Qdrant vector database) ----
+RAG_DIR     := UnivAI-Agent
+RAG_ABS_DIR := $(abspath $(RAG_DIR))
+RAG_PORT    ?= 8000
+RAG_MCP     := http://localhost:$(RAG_PORT)/mcp
+# Probed over 127.0.0.1, not localhost: the server binds IPv4 only, and a
+# localhost lookup that answers ::1 first wastes the timeout before falling back.
+RAG_PROBE   := http://127.0.0.1:$(RAG_PORT)/mcp
+QDRANT_URL  ?= http://localhost:6333
+# logs/ is gitignored, so the log and the pid handle stay out of git.
+RAG_LOG     := logs/rag-mcp.log
+RAG_PIDFILE := logs/rag-mcp.pid
+# Seconds `make rag` waits for the MCP server before giving up. The first run
+# downloads the embedding and reranker models, which is minutes. RAG_WAIT=0
+# returns immediately and leaves it starting in the background (what `dev` does).
+RAG_WAIT    ?= 300
+# PIDs owned by this checkout's RAG server. Matching on the command line alone
+# is not enough: it also finds shells and mcp_server.py processes from other
+# projects. The executable and /proc working directory keep shutdown scoped to
+# this UnivAI-Agent checkout.
+RAG_PIDS := for p in $$(pgrep -f 'mcp_server\.py' 2>/dev/null || true); do \
+		case "$$(ps -o comm= -p $$p 2>/dev/null)" in \
+			python*|uv) [ "$$(readlink -f /proc/$$p/cwd 2>/dev/null)" = "$(RAG_ABS_DIR)" ] && echo $$p;; \
+		esac; \
+	done
+
 # Minimum Node version accepted by UnivAI.
 # Versions above NODE_TESTED_MAJOR are accepted, but produce a warning.
 NODE_MIN_MAJOR    ?= 20
@@ -67,7 +93,7 @@ export PATH := $(WINDOWS_NODE_DIR):$(PATH)
 endif
 endif
 
-.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag app worker exams slides dev dev-integration status clean
+.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean
 
 help: ## Show this help
 	@echo ""
@@ -257,7 +283,7 @@ up: ## Start Postgres + Qdrant + Mongo, then apply the schema
 	@$(MAKE) --no-print-directory schema
 	@echo "Postgres :5433   Qdrant :6333   Mongo :27017   LiveKit :7880"
 
-down: ## Stop Postgres + Qdrant (data is kept)
+down: rag-stop ## Stop Postgres + Qdrant + the RAG server (data is kept)
 	$(COMPOSE) down
 
 schema: ## Apply infra/schema.sql (idempotent)
@@ -299,8 +325,112 @@ reset: ## Wipe lectures, attendance, grades, Q&A and reset the virtual clock
 
 # ---------------------------------------------------------------- the three processes
 
-rag: ## Run the team's RAG MCP server (needs Qdrant) — :8000
-	cd UnivAI-Agent && uv run python mcp_server.py
+rag: rag-db ## Start the whole RAG stack — Qdrant + the MCP server, in the background
+	@mkdir -p logs
+	@set -u; \
+	running="$$($(RAG_PIDS))"; \
+	if curl -s -o /dev/null -m 2 $(RAG_PROBE); then \
+		if [ -n "$$running" ]; then \
+			echo "RAG MCP server is already answering on :$(RAG_PORT)"; \
+			exit 0; \
+		fi; \
+		echo "ERROR: something is already listening on :$(RAG_PORT), but it is not"; \
+		echo "       the RAG MCP server. Free the port, or pick another one:"; \
+		echo "       make rag RAG_PORT=8001"; \
+		exit 1; \
+	fi; \
+	if [ ! -d "$(RAG_DIR)/.venv" ]; then \
+		echo "ERROR: $(RAG_DIR)/.venv is missing. Run: make setup"; \
+		exit 1; \
+	fi; \
+	echo "==> starting the RAG MCP server (log: $(RAG_LOG))"; \
+	( cd $(RAG_DIR) && FASTMCP_HOST=127.0.0.1 FASTMCP_PORT=$(RAG_PORT) \
+		exec uv run python mcp_server.py ) >> $(RAG_LOG) 2>&1 & \
+	echo $$! > $(RAG_PIDFILE); \
+	if [ "$(RAG_WAIT)" -le 0 ]; then \
+		echo "starting in the background — follow it with: make rag-logs"; \
+		exit 0; \
+	fi; \
+	echo "==> waiting for :$(RAG_PORT) (the first run downloads the embedding and"; \
+	echo "    reranker models, so this can take minutes — make rag-logs to watch)"; \
+	for i in $$(seq 1 $(RAG_WAIT)); do \
+		if curl -s -o /dev/null -m 2 $(RAG_PROBE); then \
+			echo ""; \
+			echo "  RAG MCP  $(RAG_MCP)"; \
+			echo "  Qdrant   $(QDRANT_URL)"; \
+			echo "  log      $(RAG_LOG)      stop with: make rag-down"; \
+			echo ""; \
+			exit 0; \
+		fi; \
+		if ! kill -0 "$$(cat $(RAG_PIDFILE) 2>/dev/null)" 2>/dev/null; then \
+			echo "ERROR: the MCP server exited during startup. Last 20 log lines:"; \
+			tail -n 20 $(RAG_LOG) 2>/dev/null; \
+			rm -f $(RAG_PIDFILE); \
+			exit 1; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "ERROR: :$(RAG_PORT) did not answer within $(RAG_WAIT)s. It may still be"; \
+	echo "       loading models — check with: make rag-logs"; \
+	exit 1
+
+rag-db: ## Start just the Qdrant vector database — :6333
+	@$(COMPOSE) up -d qdrant
+	@echo "==> waiting for Qdrant on $(QDRANT_URL)"
+	@for i in $$(seq 1 60); do \
+		if curl -sf -m 2 $(QDRANT_URL)/readyz >/dev/null 2>&1 || \
+		   curl -sf -m 2 $(QDRANT_URL)/collections >/dev/null 2>&1; then \
+			echo "Qdrant ready"; \
+			exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "ERROR: Qdrant did not become ready within 60s. Check: docker logs univai-qdrant"; \
+	exit 1
+
+# Stops the MCP server by its recorded pid, then sweeps any stray process still
+# running mcp_server.py — `make dev` and a hand-started server can both leave one
+# behind, and a half-dead server holding :8000 is worse than none.
+#
+# Deliberately has no ## description: it is the shared building block behind
+# rag-down, down and clean rather than something to reach for directly. The
+# server runs detached, so anything that takes its Qdrant away has to stop it
+# too, or it survives answering :8000 against a vector store that is gone.
+rag-stop:
+	@set -u; \
+	known=""; \
+	if [ -f $(RAG_PIDFILE) ]; then \
+		pid="$$(cat $(RAG_PIDFILE) 2>/dev/null || true)"; \
+		owned="$$($(RAG_PIDS))"; \
+		if [ -n "$$pid" ] && printf '%s\n' "$$owned" | grep -qx "$$pid"; then \
+			kill -TERM "$$pid" 2>/dev/null || true; \
+			known="$$pid"; \
+			echo "stopped the RAG MCP server (pid $$pid)"; \
+		elif [ -n "$$pid" ]; then \
+			echo "ignored stale RAG pid file (pid $$pid is not owned by this checkout)"; \
+		fi; \
+		rm -f $(RAG_PIDFILE); \
+	fi; \
+	for pid in $$($(RAG_PIDS)); do \
+		[ "$$pid" = "$$known" ] && continue; \
+		kill -TERM "$$pid" 2>/dev/null && echo "stopped a stray mcp_server.py process (pid $$pid)" || true; \
+	done; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+		curl -s -o /dev/null -m 1 $(RAG_PROBE) || break; \
+		sleep 1; \
+	done; \
+	if curl -s -o /dev/null -m 1 $(RAG_PROBE); then \
+		echo "WARNING: :$(RAG_PORT) is still answering; sending SIGKILL"; \
+		for pid in $$($(RAG_PIDS)); do kill -KILL "$$pid" 2>/dev/null || true; done; \
+	fi
+
+rag-down: rag-stop ## Stop the RAG MCP server and the Qdrant container (vectors are kept)
+	@$(COMPOSE) rm -sf qdrant >/dev/null 2>&1 && echo "stopped and removed the univai-qdrant container"
+	@echo "vectors are kept in the univai-qdrant volume — 'make clean' destroys them"
+
+rag-logs: ## Follow the background RAG MCP server log
+	@test -f $(RAG_LOG) || { echo "no log yet at $(RAG_LOG) — start it with: make rag"; exit 1; }
+	@tail -n 50 -f $(RAG_LOG)
 
 app: ## Run the Next.js app — :$(APP_PORT)
 	cd UnivAI-app && npx next dev -p $(APP_PORT)
@@ -336,13 +466,17 @@ ifeq ($(OS),Windows_NT)
 	@start "UnivAI worker" cmd //k ".venv\Scripts\python.exe UnivAI-live\worker.py dev"
 	@start "UnivAI exams"  //D UnivAI-exam_system cmd //k "npm run dev"
 else
-	@($(MAKE) rag &) ; ($(MAKE) app &) ; ($(MAKE) worker &) ; ($(MAKE) exams &)
+# RAG detaches itself and logs to a file, so it needs no window and no wait.
+	@$(MAKE) --no-print-directory rag RAG_WAIT=0
+	@($(MAKE) app &) ; ($(MAKE) worker &) ; ($(MAKE) exams &)
 endif
 	@echo ""
 	@echo "  app    http://localhost:$(APP_PORT)"
 	@echo "  admin  http://localhost:$(APP_PORT)/admin   (move the virtual clock here)"
 	@echo "  exams  http://localhost:3200"
-	@echo "  RAG    http://localhost:8000/mcp"
+	@echo "  RAG    $(RAG_MCP)"
+	@echo ""
+	@echo "  RAG runs detached — 'make rag-logs' to watch it, 'make rag-down' to stop it."
 	@echo ""
 	@echo "  Ollama wakes automatically on Windows. The course generator and"
 	@echo "  lecture Q&A call it at :11434 (gemma3:1b - one light model, no fallback)."
@@ -353,11 +487,12 @@ status: ## Show what is running
 	@echo "containers:" && docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
 	@printf "app    :$(APP_PORT)  " && (curl -s -o /dev/null -m 2 http://localhost:$(APP_PORT)/api/clock && echo "up") || echo "down"
 	@printf "exams  :3200  " && (curl -s -o /dev/null -m 2 http://localhost:3200 && echo "up") || echo "down"
-	@printf "RAG    :8000  " && (curl -s -o /dev/null -m 2 http://localhost:8000/mcp && echo "up") || echo "down"
+	@printf "RAG    :$(RAG_PORT)  " && (curl -s -o /dev/null -m 2 $(RAG_MCP) && echo "up") || echo "down"
+	@printf "qdrant :6333  " && (curl -sf -m 2 $(QDRANT_URL)/collections >/dev/null 2>&1 && echo "up") || echo "down"
 	@printf "livekit:7880  " && (curl -s -o /dev/null -m 2 http://127.0.0.1:7880 && echo "up") || echo "down"
 	@printf "clock  " && (curl -s -m 2 http://localhost:$(APP_PORT)/api/clock || echo "(app down)") && echo ""
 
-clean: ## Remove containers AND their volumes. Destroys the database and the vectors
+clean: rag-stop ## Remove containers AND their volumes. Destroys the database and the vectors
 	$(COMPOSE) down -v
 	@echo "containers and volumes removed"
 
