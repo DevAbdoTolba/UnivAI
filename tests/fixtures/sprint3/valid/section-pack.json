@@ -1,0 +1,43 @@
+{
+  "schema_version": "section-pack-v1",
+  "section_pack_id": "section-pack-week-2",
+  "tenant_id": "tenant-a",
+  "programme_id": "programme-a",
+  "course_id": "course-foundations",
+  "week": 2,
+  "lecture_id": "lecture-7-2",
+  "approved_plan_id": "plan-tenant-a-7",
+  "approved_plan_version": 4,
+  "prompt_trace": { "prompt_id": "section.generate", "prompt_version": "1.0.0" },
+  "objectives": ["obj-2"],
+  "duration_minutes": 35,
+  "activities": [
+    {
+      "activity_id": "activity-example-1",
+      "kind": "worked_example",
+      "order": 1,
+      "time_box_minutes": 20,
+      "title": "Trace a durable write",
+      "steps": [
+        { "text": "Identify the write boundary.", "provenance": [{ "document_id": "book-foundations", "page_start": 88, "page_end": 90, "section": "Durability and processes", "passage_ids": ["passage-foundations-88"] }] },
+        { "text": "Trace the log flush before acknowledgement.", "provenance": [{ "document_id": "book-foundations", "page_start": 91, "page_end": 94, "section": "Write acknowledgement", "passage_ids": ["passage-foundations-92"] }] }
+      ],
+      "todo": null,
+      "provenance": [
+        { "document_id": "book-foundations", "page_start": 88, "page_end": 94, "section": "Durability and processes", "passage_ids": ["passage-foundations-88", "passage-foundations-92"] }
+      ]
+    },
+    {
+      "activity_id": "activity-todo-1",
+      "kind": "todo",
+      "order": 2,
+      "time_box_minutes": 15,
+      "title": "Compare two acknowledgement points",
+      "steps": [],
+      "todo": "Draw both write timelines and mark the first durable point.",
+      "provenance": [
+        { "document_id": "book-foundations", "page_start": 91, "page_end": 94, "section": "Write acknowledgement", "passage_ids": ["passage-foundations-92"] }
+      ]
+    }
+  ]
+}

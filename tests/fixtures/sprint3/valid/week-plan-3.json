@@ -1,0 +1,16 @@
+{
+  "schema_version": "semester-week-plan-v1",
+  "plan_id": "plan-3", "plan_version": 1,
+  "learning_path_id": "path-3", "learning_path_version": 1,
+  "tenant_id": "tenant-a", "semester_id": "semester-3", "week_count": 3,
+  "weeks": [
+    { "week": 1, "document_id": "book-a", "chapter_ids": ["a-ch1"], "objective_ids": ["obj-1"], "lecture_id": "lecture-3-1", "section_pack_id": null },
+    { "week": 2, "document_id": "book-a", "chapter_ids": ["a-ch2"], "objective_ids": ["obj-2"], "lecture_id": "lecture-3-2", "section_pack_id": null },
+    { "week": 3, "document_id": "book-a", "chapter_ids": ["a-ch3"], "objective_ids": ["obj-3"], "lecture_id": "lecture-3-3", "section_pack_id": null }
+  ],
+  "schedule_items": [
+    { "schedule_item_id": "schedule-3-1", "week": 1, "sequence": 1, "session_type": "lecture", "artifact_id": "lecture-3-1", "starts_at": "2026-09-01T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-3-2", "week": 2, "sequence": 2, "session_type": "lecture", "artifact_id": "lecture-3-2", "starts_at": "2026-09-08T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-3-3", "week": 3, "sequence": 3, "session_type": "lecture", "artifact_id": "lecture-3-3", "starts_at": "2026-09-15T09:00:00Z", "status": "ready" }
+  ]
+}

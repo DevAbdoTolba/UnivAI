@@ -1,0 +1,10 @@
+{
+  "schema_version": "publication-receipt-v1",
+  "receipt_id": "receipt-final-rejected",
+  "package_id": "final-package-corrupt", "package_version": 1,
+  "package_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+  "kind": "final", "tenant_id": "tenant-a", "status": "rejected",
+  "published_assessment_id": null, "published_version": null,
+  "defects": [{ "code": "PROVENANCE_NOT_RESOLVED", "question_id": "final-bad-q1", "field": "questions[0].provenance", "message": "the cited passage does not resolve inside the approved plan", "retryable": true }],
+  "audit_event_id": "audit-reject-final-1", "processed_at": "2026-10-14T12:02:00Z"
+}

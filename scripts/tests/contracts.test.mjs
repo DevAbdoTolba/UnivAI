@@ -3,9 +3,13 @@ import test from "node:test";
 
 import {
   checkContracts,
+  checkSprint3Contracts,
+  validateContractDocument,
   validateQuiz,
   validateScript,
 } from "../contract-check.mjs";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { parseSubmodules } from "../submodules-check.mjs";
 
 test("gitmodules parser keeps path, URL, and branch", () => {
@@ -24,6 +28,22 @@ test("gitmodules parser keeps path, URL, and branch", () => {
 
 test("current working contracts validate", () => {
   assert.deepEqual(checkContracts(process.cwd()), []);
+});
+
+test("Sprint 3 valid and adversarial fixtures agree with their schemas", () => {
+  assert.deepEqual(checkSprint3Contracts(process.cwd()), []);
+});
+
+test("Sprint 3 semantic validation rejects stale exact-version approval", () => {
+  const root = process.cwd();
+  const schema = JSON.parse(
+    readFileSync(path.join(root, "docs/contracts/schemas/learning-path-v1.schema.json"), "utf8")
+  );
+  const fixture = JSON.parse(
+    readFileSync(path.join(root, "tests/fixtures/sprint3/valid/learning-path.json"), "utf8")
+  );
+  fixture.approval.approved_version -= 1;
+  assert.match(validateContractDocument(fixture, schema).join("\n"), /exact path version/);
 });
 
 test("invalid lecture and quiz fixtures are rejected", () => {

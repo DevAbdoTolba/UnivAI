@@ -50,6 +50,14 @@ async function main() {
   } catch {
     failures.push("static contract validation");
   }
+  try {
+    execFileSync(process.execPath, ["scripts/sprint3-smoke.mjs", "--mode", "mock"], {
+      cwd: root,
+      stdio: "inherit",
+    });
+  } catch {
+    failures.push("Sprint 3 mock learning-flow validation");
+  }
 
   for (const container of [
     "univai-db",

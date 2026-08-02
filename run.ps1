@@ -76,6 +76,7 @@ function Target-Help {
         @("seed-demo","Apply deterministic integration-demo records"),
         @("submodules-check","Verify pinned submodule SHAs and clean state"),
         @("contract-check","Validate cross-repository contracts"),
+        @("sprint3-smoke","Run Sprint 3 mock contracts and fail-closed paths"),
         @("integration-smoke","Run bounded integration checkpoints"),
         @("seed-auth","Promote SUPER_ADMIN_EMAIL if the user exists"),
         @("rag-models","Download/preload RAG embedding models"),
@@ -185,7 +186,14 @@ function Target-Up {
 # without stopping it leaves it answering :8000 against a store that is gone.
 function Target-Down   { Target-RagStop; docker @Compose down }
 function Target-Clean  { Target-RagStop; docker @Compose down -v; Warn "containers and volumes removed" }
-function Target-Schema { Invoke-Sql "infra/schema.sql"; Write-Host "schema applied" -ForegroundColor Green }
+function Target-Schema {
+    Invoke-Sql "infra/schema.sql"
+    Invoke-Sql "infra/migrations/002_final_mvp.sql"
+    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    Invoke-Sql "infra/migrations/003_sprint3_learning_flow.sql"
+    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    Write-Host "base schema and migrations 002-003 applied" -ForegroundColor Green
+}
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }
 function Target-SeedAuth {
@@ -231,6 +239,7 @@ function Target-SeedDemo {
 }
 function Target-SubmodulesCheck { node scripts/submodules-check.mjs }
 function Target-ContractCheck { node scripts/contract-check.mjs }
+function Target-Sprint3Smoke { node scripts/sprint3-smoke.mjs --mode mock }
 function Target-IntegrationSmoke { node scripts/integration-smoke.mjs }
 
 function Target-Reset {
@@ -511,6 +520,7 @@ switch ($Target.ToLower()) {
     "seed-demo" { Target-SeedDemo }
     "submodules-check" { Target-SubmodulesCheck }
     "contract-check" { Target-ContractCheck }
+    "sprint3-smoke" { Target-Sprint3Smoke }
     "integration-smoke" { Target-IntegrationSmoke }
     "reset"  { Target-Reset }
     "rag"    { Target-Rag }

@@ -1,0 +1,4 @@
+{
+  "schema_version": "personalized-prompt-manifest-v1", "manifest_id": "bad-manifest", "learner_id": "usr_a", "normalized_name_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "language": "en-US", "voice": "voice", "model": "model", "model_version": "1", "sample_rate_hz": 24000, "phrase_set_version": "v1", "cache_key": "prompt-cache/Sara", "state": "ready",
+  "clips": [{ "phrase_id": "ack", "template_version": "1", "storage_key": "prompt-cache/Sara/ack.wav", "checksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "media_type": "audio/wav", "duration_ms": 100 }], "created_at": "2026-09-01T09:00:00Z"
+}

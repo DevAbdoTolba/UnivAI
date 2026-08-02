@@ -1,0 +1,12 @@
+{
+  "schema_version": "tenant-document-grant-v1",
+  "grant_id": "grant-tenant-b-ddia",
+  "tenant_id": "tenant-b",
+  "collection_id": "collection-b",
+  "document_id": "book-b-ddia-copy",
+  "content_key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "display": { "filename": "systems-book.pdf", "title": "DDIA course copy" },
+  "status": "active",
+  "granted_at": "2026-08-02T09:02:00Z",
+  "revoked_at": null
+}

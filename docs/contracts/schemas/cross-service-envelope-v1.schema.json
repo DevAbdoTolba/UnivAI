@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/contracts/cross-service-envelope-v1.schema.json",
+  "title": "CrossServiceEnvelopeV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "trace_id", "operation", "actor", "target", "idempotency", "provenance", "audit", "payload", "error"],
+  "properties": {
+    "schema_version": { "const": "cross-service-envelope-v1" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "operation": { "type": "string", "minLength": 1 },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_id", "learner_id", "auth_context_id"],
+      "properties": {
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "learner_id": { "type": "string", "minLength": 1 },
+        "auth_context_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "resource_id", "expected_version"],
+      "properties": {
+        "service": { "enum": ["core", "app", "agent", "live", "exam"] },
+        "resource_id": { "type": "string", "minLength": 1 },
+        "expected_version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "request_hash"],
+      "properties": {
+        "key": { "type": "string", "minLength": 8 },
+        "request_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "contract_version", "approved_plan_id", "approved_plan_version", "producer"],
+      "properties": {
+        "contract": { "type": "string", "minLength": 1 },
+        "contract_version": { "type": "string", "minLength": 1 },
+        "approved_plan_id": { "type": "string", "minLength": 1 },
+        "approved_plan_version": { "type": "integer", "minimum": 1 },
+        "producer": { "enum": ["core", "app", "agent", "live", "exam"] }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "occurred_at"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "occurred_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "payload": { "type": ["object", "null"] },
+    "error": {
+      "type": ["object", "null"],
+      "required": ["code", "message", "retryable", "details"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "retryable": { "type": "boolean" },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

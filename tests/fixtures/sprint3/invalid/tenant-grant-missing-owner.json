@@ -1,0 +1,5 @@
+{
+  "schema_version": "tenant-document-grant-v1", "grant_id": "bad-grant", "collection_id": "collection-c", "document_id": "book-c",
+  "content_key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "display": { "filename": "book.pdf", "title": "Book" }, "status": "active", "granted_at": "2026-08-02T09:00:00Z", "revoked_at": null
+}

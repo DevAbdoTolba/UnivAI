@@ -1,0 +1,8 @@
+{
+  "schema_version": "startup-trace-v1", "trace_id": "bad-trace", "tenant_id": "tenant-a", "session_id": "session", "mode": "warm", "sample_origin": "mock", "target_hardware": "fixture", "result": "ready", "failure_code": null,
+  "stages": [
+    { "name": "dispatch", "elapsed_ms": 0 }, { "name": "artifact_loaded", "elapsed_ms": 300 }, { "name": "metadata_valid", "elapsed_ms": 200 },
+    { "name": "room_connected", "elapsed_ms": 400 }, { "name": "track_published", "elapsed_ms": 500 }, { "name": "ready_acknowledged", "elapsed_ms": 600 }, { "name": "first_frame", "elapsed_ms": 700 }
+  ],
+  "ready_ms": 600, "first_frame_ms": 700, "recorded_at": "2026-09-01T09:00:00Z"
+}

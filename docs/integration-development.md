@@ -34,6 +34,7 @@ Set-Location UnivAI
 |---|---|---|
 | `make submodules-check` | `./run.ps1 submodules-check` | Print URL, branch hint, recorded gitlink, checked-out SHA, branch/detached state, and dirtiness. Fails on dirty/missing/mismatched submodules. |
 | `make contract-check` | `./run.ps1 contract-check` | Validate Agent MCP, lecture/quiz, Live messages, Exam webhook/policy, course-size, and environment contracts. |
+| `make sprint3-smoke` | `./run.ps1 sprint3-smoke` | Validate Sprint 3 schemas, canonical 3/7/14-week fixtures, and deterministic fail-closed journeys. Mock startup traces prove ordering only, never the latency SLO. |
 | `make seed-demo` | `./run.ps1 seed-demo` | Apply fixed PostgreSQL and MongoDB demo records for `S-2026-000042`, including a real Better Auth credential account. |
 | `make integration-smoke` | `./run.ps1 integration-smoke` | Run strict submodule/static gates, container health, App/Exam readiness, a seeded non-consuming Exam read, virtual clock, real Agent `server_info`, LiveKit signalling, and deterministic Live message validation with bounded timeouts. |
 | `make down` | `./run.ps1 down` | Stop containers and preserve volumes. |
@@ -41,6 +42,58 @@ Set-Location UnivAI
 
 The deterministic smoke never invokes a real course LLM, camera, microphone,
 TTS, or STT model. Real-provider checks are optional and explicit.
+
+`make schema` and `./run.ps1 schema` apply the MVP-1 base followed by migrations
+`002_final_mvp.sql` and `003_sprint3_learning_flow.sql`. Applied versions are
+recorded in `core_schema_migrations`; all scripts remain idempotent.
+
+## Sprint 3 integrated gate
+
+Run the integrated gate only after the component PRs are merged and the real
+stack is healthy:
+
+```bash
+node scripts/sprint3-smoke.mjs --mode integrated
+```
+
+The component routes are deliberately configured rather than guessed by Core.
+Set an authenticated read URL for each real contract plus the target-hardware
+startup evidence file:
+
+```text
+SPRINT3_TEST_BEARER_TOKEN
+SPRINT3_GRANT_URL
+SPRINT3_LEARNING_PATH_URL
+SPRINT3_WEEK_PLAN_URL
+SPRINT3_SECTION_PACK_URL
+SPRINT3_SECTION_SESSION_URL
+SPRINT3_ASSESSMENT_PACKAGE_URL
+SPRINT3_PUBLICATION_RECEIPT_URL
+SPRINT3_PROMPT_MANIFEST_URL
+SPRINT3_SIGNED_NAME_URL
+SPRINT3_STARTUP_EVIDENCE_FILE
+```
+
+Each URL must return its contract document directly or inside an envelope's
+`payload`. The bearer token belongs to a dedicated local integration learner;
+never commit it. The startup evidence file has this shape:
+
+```json
+{
+  "configuration": {
+    "hardware": "human-readable target hardware",
+    "live_commit": "reviewed SHA"
+  },
+  "traces": []
+}
+```
+
+`traces` must contain at least 30 real `measured` cold and 30 real `measured`
+warm `StartupTraceV1` documents. The gate computes p50, p95, max, and failure
+count from the raw samples; it refuses mock samples, missing configuration,
+failed runs, cold p95 above 5 seconds, or warm p95 above 2 seconds. A missing
+route, token, component, or evidence file is a concrete blocker and cannot be
+reported as integrated PASS.
 
 After `seed-demo`, the local integration login is
 `learner@univai.local` / `LearnLocal123!`. These credentials are only for the

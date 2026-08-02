@@ -1,0 +1,14 @@
+{
+  "schema_version": "startup-trace-v1", "trace_id": "mock-warm-1", "tenant_id": "tenant-a", "session_id": "session-warm-1",
+  "mode": "warm", "sample_origin": "mock", "target_hardware": "deterministic-fixture-only", "result": "ready", "failure_code": null,
+  "stages": [
+    { "name": "dispatch", "elapsed_ms": 0 },
+    { "name": "metadata_valid", "elapsed_ms": 40 },
+    { "name": "artifact_loaded", "elapsed_ms": 150 },
+    { "name": "room_connected", "elapsed_ms": 450 },
+    { "name": "track_published", "elapsed_ms": 700 },
+    { "name": "ready_acknowledged", "elapsed_ms": 900 },
+    { "name": "first_frame", "elapsed_ms": 1020 }
+  ],
+  "ready_ms": 900, "first_frame_ms": 1020, "recorded_at": "2026-08-02T11:01:00Z"
+}

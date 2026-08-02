@@ -1,0 +1,8 @@
+{
+  "schema_version": "cross-service-envelope-v1", "request_id": "request", "trace_id": "trace", "operation": "assessment.publish",
+  "actor": { "tenant_id": "tenant-a", "learner_id": "usr_a", "auth_context_id": "auth" },
+  "target": { "service": "exam", "resource_id": "pkg", "expected_version": 1 },
+  "idempotency": { "key": "short" },
+  "provenance": { "contract": "AssessmentPackage", "contract_version": "assessment-package-v1", "approved_plan_id": "plan", "approved_plan_version": 1, "producer": "agent" },
+  "audit": { "event_id": "audit", "occurred_at": "2026-09-01T09:00:00Z" }, "payload": {}, "error": null
+}
