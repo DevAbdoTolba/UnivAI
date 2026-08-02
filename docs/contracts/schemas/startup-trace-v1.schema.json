@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/contracts/startup-trace-v1.schema.json",
+  "title": "StartupTraceV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "trace_id", "tenant_id", "session_id", "mode", "sample_origin", "target_hardware", "result", "failure_code", "stages", "ready_ms", "first_frame_ms", "recorded_at"],
+  "properties": {
+    "schema_version": { "const": "startup-trace-v1" },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["cold", "warm"] },
+    "sample_origin": { "enum": ["mock", "measured"] },
+    "target_hardware": { "type": "string", "minLength": 1 },
+    "result": { "enum": ["ready", "failed", "cancelled"] },
+    "failure_code": { "type": ["string", "null"] },
+    "stages": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "elapsed_ms"],
+        "properties": {
+          "name": { "enum": ["dispatch", "metadata_valid", "artifact_loaded", "room_connected", "track_published", "ready_acknowledged", "first_frame"] },
+          "elapsed_ms": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "ready_ms": { "type": "number", "minimum": 0, "maximum": 8000 },
+    "first_frame_ms": { "type": "number", "minimum": 0 },
+    "recorded_at": { "type": "string", "format": "date-time" }
+  }
+}

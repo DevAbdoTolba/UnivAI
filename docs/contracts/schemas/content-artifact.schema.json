@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/contracts/content-artifact-v1.schema.json",
+  "title": "ContentArtifactV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "content_key", "original_sha256", "pipeline_fingerprint", "state", "byte_length", "page_count", "artifact_checksum", "storage_ref", "created_at"],
+  "properties": {
+    "schema_version": { "const": "content-artifact-v1" },
+    "content_key": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}\\.pipeline:[a-f0-9]{64}$" },
+    "original_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "pipeline_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parser", "chunker", "embedding_model", "vector_schema", "contract"],
+      "properties": {
+        "parser": { "type": "string", "minLength": 1 },
+        "chunker": { "type": "string", "minLength": 1 },
+        "embedding_model": { "type": "string", "minLength": 1 },
+        "vector_schema": { "type": "string", "minLength": 1 },
+        "contract": { "const": "content-artifact-v1" }
+      }
+    },
+    "state": { "enum": ["building", "ready", "failed", "cleanup_eligible"] },
+    "byte_length": { "type": "integer", "minimum": 1 },
+    "page_count": { "type": "integer", "minimum": 1 },
+    "artifact_checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "storage_ref": { "type": "string", "pattern": "^artifact://[A-Za-z0-9._/-]+$" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

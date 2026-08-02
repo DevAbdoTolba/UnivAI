@@ -1,0 +1,11 @@
+{
+  "schema_version": "semester-week-plan-v1", "plan_id": "bad-plan", "plan_version": 1, "learning_path_id": "path", "learning_path_version": 1, "tenant_id": "tenant-a", "semester_id": "semester", "week_count": 2,
+  "weeks": [
+    { "week": 1, "document_id": "book-a", "chapter_ids": ["ch1"], "objective_ids": ["obj1"], "lecture_id": "lecture-1", "section_pack_id": null },
+    { "week": 3, "document_id": "book-a", "chapter_ids": ["ch3"], "objective_ids": ["obj3"], "lecture_id": "lecture-3", "section_pack_id": null }
+  ],
+  "schedule_items": [
+    { "schedule_item_id": "s1", "week": 1, "sequence": 1, "session_type": "lecture", "artifact_id": "lecture-1", "starts_at": "2026-09-01T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "s3", "week": 3, "sequence": 2, "session_type": "lecture", "artifact_id": "lecture-3", "starts_at": "2026-09-15T09:00:00Z", "status": "ready" }
+  ]
+}

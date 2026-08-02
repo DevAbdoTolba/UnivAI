@@ -1,0 +1,4 @@
+{
+  "schema_version": "publication-receipt-v1", "receipt_id": "bad-receipt", "package_id": "pkg", "package_version": 1, "package_hash": "1111111111111111111111111111111111111111111111111111111111111111", "kind": "quiz", "tenant_id": "tenant-a", "status": "accepted", "published_assessment_id": null, "published_version": null,
+  "defects": [{ "code": "BAD", "question_id": null, "field": "package", "message": "accepted with defects", "retryable": false }], "audit_event_id": "audit", "processed_at": "2026-09-01T09:00:00Z"
+}

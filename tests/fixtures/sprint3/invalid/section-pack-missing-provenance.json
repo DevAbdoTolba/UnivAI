@@ -1,0 +1,8 @@
+{
+  "schema_version": "section-pack-v1", "section_pack_id": "bad-section", "tenant_id": "tenant-a", "programme_id": "programme-a", "course_id": "course-a", "week": 1, "lecture_id": "lecture-1", "approved_plan_id": "plan", "approved_plan_version": 1,
+  "prompt_trace": { "prompt_id": "section.generate", "prompt_version": "1" }, "objectives": ["obj1"], "duration_minutes": 10,
+  "activities": [
+    { "activity_id": "example", "kind": "worked_example", "order": 1, "time_box_minutes": 5, "title": "Invented", "steps": ["Unsupported step"], "todo": null, "provenance": [] },
+    { "activity_id": "todo", "kind": "todo", "order": 2, "time_box_minutes": 5, "title": "Unsupported", "steps": [], "todo": "Do unsupported work", "provenance": [] }
+  ]
+}

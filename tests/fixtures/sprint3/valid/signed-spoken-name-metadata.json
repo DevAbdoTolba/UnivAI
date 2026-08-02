@@ -1,0 +1,19 @@
+{
+  "schema_version": "signed-spoken-name-metadata-v1",
+  "learner_id": "usr_learner_a",
+  "tenant_id": "tenant-a",
+  "session_id": "lecture-session-a-2",
+  "lecture_id": "lecture-7-2",
+  "approved_plan_id": "plan-tenant-a-7",
+  "approved_plan_version": 4,
+  "safe_spoken_name": "Sara",
+  "name_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "nonce": "nonce-2026-08-02-0001",
+  "issued_at": "2026-09-08T08:55:00Z",
+  "expires_at": "2026-09-08T09:10:00Z",
+  "signature": {
+    "algorithm": "EdDSA",
+    "key_id": "live-metadata-2026-01",
+    "value": "ZXhhbXBsZS1zaWduYXR1cmUtdmFsdWUtbm90LWEtcmVhbC1rZXk"
+  }
+}

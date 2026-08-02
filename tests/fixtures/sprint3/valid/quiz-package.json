@@ -1,0 +1,28 @@
+{
+  "schema_version": "assessment-package-v1",
+  "package_contract": "quiz-package-v1",
+  "package_id": "quiz-package-week-2", "package_version": 1, "kind": "quiz",
+  "tenant_id": "tenant-a", "learner_id": "usr_learner_a", "programme_id": "programme-a", "course_id": "course-foundations",
+  "learning_path_id": "path-tenant-a-001", "learning_path_version": 2,
+  "approved_plan_id": "plan-tenant-a-7", "approved_plan_version": 4,
+  "blueprint": { "blueprint_id": "quiz-weekly", "blueprint_version": 3, "required_question_count": 2, "integration_minimum": 0, "max_week_concentration": 1 },
+  "generator_prompt": { "prompt_id": "assessment.quiz.generate", "prompt_version": "2.1.0", "trace_id": "agent-trace-quiz-2" },
+  "scope": { "week_numbers": [2], "chapter_ids": ["foundations-ch2"], "objective_ids": ["obj-2"], "semester_complete": false },
+  "questions": [
+    {
+      "question_id": "quiz-2-q1", "question_hash": "eee2aa870f09c5b5d15c5c35d3fe2e77b4a5e794cbfcf42341c8adcf1a13043b", "format": "mcq",
+      "prompt": "Which event makes the write durable in the cited sequence?",
+      "options": ["Buffer allocation", "Log flush", "Client retry", "Read repair"], "correct_option": "B", "answer_key": "B", "rubric": null,
+      "difficulty": "easy", "integration": false, "objective_ids": ["obj-2"],
+      "provenance": [{ "document_id": "book-foundations", "content_key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "week": 2, "chapter_id": "foundations-ch2", "page_start": 88, "page_end": 91, "section": "Durability and processes", "passage_ids": ["passage-foundations-88"] }]
+    },
+    {
+      "question_id": "quiz-2-q2", "question_hash": "6502eaedfebf5ca07372d46a75b5169971d2f9b3f39e6d3ea327e0ef76097bff", "format": "mcq",
+      "prompt": "What is the risk of acknowledging before durable storage?",
+      "options": ["Lost acknowledged data", "Duplicate schema", "More indexes", "Lower latency only"], "correct_option": "A", "answer_key": "A", "rubric": null,
+      "difficulty": "medium", "integration": false, "objective_ids": ["obj-2"],
+      "provenance": [{ "document_id": "book-foundations", "content_key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "week": 2, "chapter_id": "foundations-ch2", "page_start": 91, "page_end": 94, "section": "Write acknowledgement", "passage_ids": ["passage-foundations-92"] }]
+    }
+  ],
+  "created_at": "2026-09-08T12:00:00Z"
+}

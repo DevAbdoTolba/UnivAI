@@ -1,0 +1,12 @@
+{
+  "schema_version": "learning-path-v1", "path_id": "path-cycle", "path_version": 1, "parent_path_version": null, "tenant_id": "tenant-a", "collection_id": "collection-a", "status": "approved",
+  "ordered_books": [
+    { "position": 1, "document_id": "book-a", "title": "A", "starts_at_chapter": 1, "chapter_ids": ["a-1"], "week_start": 1, "week_end": 1 },
+    { "position": 2, "document_id": "book-b", "title": "B", "starts_at_chapter": 1, "chapter_ids": ["b-1"], "week_start": 2, "week_end": 2 }
+  ],
+  "prerequisite_edges": [
+    { "from_document_id": "book-a", "to_document_id": "book-b", "confidence": 0.9, "rationale": "A before B", "evidence": [{ "role": "prerequisite", "document_id": "book-a", "page_start": 1, "page_end": 1, "section": "A", "passage_ids": ["a"] }, { "role": "dependent", "document_id": "book-b", "page_start": 1, "page_end": 1, "section": "B", "passage_ids": ["b"] }] },
+    { "from_document_id": "book-b", "to_document_id": "book-a", "confidence": 0.9, "rationale": "B before A", "evidence": [{ "role": "prerequisite", "document_id": "book-b", "page_start": 1, "page_end": 1, "section": "B", "passage_ids": ["b"] }, { "role": "dependent", "document_id": "book-a", "page_start": 1, "page_end": 1, "section": "A", "passage_ids": ["a"] }] }
+  ],
+  "warnings": [], "approval": { "approved_version": 1, "approved_by": "reviewer", "approved_at": "2026-08-02T10:00:00Z", "override_reason": null }, "created_at": "2026-08-02T09:00:00Z"
+}

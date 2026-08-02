@@ -1,0 +1,25 @@
+{
+  "schema_version": "personalized-prompt-manifest-v1",
+  "manifest_id": "prompt-manifest-a-v1",
+  "learner_id": "usr_learner_a",
+  "normalized_name_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "language": "en-US",
+  "voice": "kokoro-af-heart",
+  "model": "kokoro",
+  "model_version": "1.0",
+  "sample_rate_hz": 24000,
+  "phrase_set_version": "raise-hand-v1",
+  "cache_key": "prompt-cache/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "state": "ready",
+  "clips": [
+    {
+      "phrase_id": "raise-hand-ack",
+      "template_version": "1",
+      "storage_key": "prompt-cache/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/raise-hand-ack.wav",
+      "checksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "media_type": "audio/wav",
+      "duration_ms": 1150
+    }
+  ],
+  "created_at": "2026-08-02T10:30:00Z"
+}

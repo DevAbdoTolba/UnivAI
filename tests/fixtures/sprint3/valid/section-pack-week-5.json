@@ -1,0 +1,20 @@
+{
+  "schema_version": "section-pack-v1", "section_pack_id": "section-pack-week-5", "tenant_id": "tenant-a", "programme_id": "programme-a", "course_id": "course-databases", "week": 5, "lecture_id": "lecture-7-5", "approved_plan_id": "plan-tenant-a-7", "approved_plan_version": 4,
+  "prompt_trace": { "prompt_id": "section.generate", "prompt_version": "1.0.0" }, "objectives": ["obj-5"], "duration_minutes": 30,
+  "activities": [
+    {
+      "activity_id": "activity-db-example", "kind": "worked_example", "order": 1, "time_box_minutes": 18, "title": "Trace a replication lag incident",
+      "steps": [
+        { "text": "Mark the leader acknowledgement point.", "provenance": [{ "document_id": "book-databases", "page_start": 201, "page_end": 207, "section": "Leader-based replication", "passage_ids": ["passage-db-201"] }] },
+        { "text": "Compare the follower apply position.", "provenance": [{ "document_id": "book-databases", "page_start": 208, "page_end": 218, "section": "Replication lag", "passage_ids": ["passage-db-208"] }] }
+      ],
+      "todo": null,
+      "provenance": [{ "document_id": "book-databases", "page_start": 201, "page_end": 218, "section": "Replication", "passage_ids": ["passage-db-201", "passage-db-208"] }]
+    },
+    {
+      "activity_id": "activity-db-todo", "kind": "todo", "order": 2, "time_box_minutes": 12, "title": "Explain one stale read",
+      "steps": [], "todo": "Annotate the read path and identify the exact stale replica boundary.",
+      "provenance": [{ "document_id": "book-databases", "page_start": 211, "page_end": 218, "section": "Reading from replicas", "passage_ids": ["passage-db-211"] }]
+    }
+  ]
+}

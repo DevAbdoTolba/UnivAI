@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/contracts/section-session-meta-v1.schema.json",
+  "title": "SectionSessionMetaV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "tenant_id", "learner_id", "programme_id", "course_id", "week", "lecture_id", "section_pack_id", "approved_plan_id", "approved_plan_version", "state", "resume", "issued_at", "expires_at"],
+  "properties": {
+    "schema_version": { "const": "section-session-meta-v1" },
+    "session_id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "learner_id": { "type": "string", "minLength": 1 },
+    "programme_id": { "type": "string", "minLength": 1 },
+    "course_id": { "type": "string", "minLength": 1 },
+    "week": { "type": "integer", "minimum": 1 },
+    "lecture_id": { "type": "string", "minLength": 1 },
+    "section_pack_id": { "type": "string", "minLength": 1 },
+    "approved_plan_id": { "type": "string", "minLength": 1 },
+    "approved_plan_version": { "type": "integer", "minimum": 1 },
+    "state": { "enum": ["intro", "example", "guided_task", "waiting", "feedback", "todo_recap", "completed", "interrupted", "failed"] },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activity_id", "step_index", "todo_acknowledged", "event_version"],
+      "properties": {
+        "activity_id": { "type": ["string", "null"] },
+        "step_index": { "type": "integer", "minimum": 0 },
+        "todo_acknowledged": { "type": "boolean" },
+        "event_version": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": "content-artifact-v1",
+  "content_key": "client-trusted-hash",
+  "original_sha256": "short",
+  "pipeline_fingerprint": { "parser": "v1", "chunker": "v1", "embedding_model": "v1", "vector_schema": "v1", "contract": "content-artifact-v1" },
+  "state": "ready", "byte_length": 1, "page_count": 1, "artifact_checksum": "bad", "storage_ref": "filename.pdf", "created_at": "not-a-date"
+}

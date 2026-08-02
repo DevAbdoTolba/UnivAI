@@ -1,0 +1,38 @@
+{
+  "schema_version": "semester-week-plan-v1",
+  "plan_id": "plan-14", "plan_version": 1,
+  "learning_path_id": "path-14", "learning_path_version": 1,
+  "tenant_id": "tenant-a", "semester_id": "semester-14", "week_count": 14,
+  "weeks": [
+    { "week": 1, "document_id": "book-a", "chapter_ids": ["ch-1"], "objective_ids": ["obj-1"], "lecture_id": "lecture-14-1", "section_pack_id": null },
+    { "week": 2, "document_id": "book-a", "chapter_ids": ["ch-2"], "objective_ids": ["obj-2"], "lecture_id": "lecture-14-2", "section_pack_id": null },
+    { "week": 3, "document_id": "book-a", "chapter_ids": ["ch-3"], "objective_ids": ["obj-3"], "lecture_id": "lecture-14-3", "section_pack_id": null },
+    { "week": 4, "document_id": "book-a", "chapter_ids": ["ch-4"], "objective_ids": ["obj-4"], "lecture_id": "lecture-14-4", "section_pack_id": null },
+    { "week": 5, "document_id": "book-a", "chapter_ids": ["ch-5"], "objective_ids": ["obj-5"], "lecture_id": "lecture-14-5", "section_pack_id": null },
+    { "week": 6, "document_id": "book-a", "chapter_ids": ["ch-6"], "objective_ids": ["obj-6"], "lecture_id": "lecture-14-6", "section_pack_id": null },
+    { "week": 7, "document_id": "book-a", "chapter_ids": ["ch-7"], "objective_ids": ["obj-7"], "lecture_id": "lecture-14-7", "section_pack_id": null },
+    { "week": 8, "document_id": "book-b", "chapter_ids": ["ch-8"], "objective_ids": ["obj-8"], "lecture_id": "lecture-14-8", "section_pack_id": null },
+    { "week": 9, "document_id": "book-b", "chapter_ids": ["ch-9"], "objective_ids": ["obj-9"], "lecture_id": "lecture-14-9", "section_pack_id": null },
+    { "week": 10, "document_id": "book-b", "chapter_ids": ["ch-10"], "objective_ids": ["obj-10"], "lecture_id": "lecture-14-10", "section_pack_id": null },
+    { "week": 11, "document_id": "book-b", "chapter_ids": ["ch-11"], "objective_ids": ["obj-11"], "lecture_id": "lecture-14-11", "section_pack_id": null },
+    { "week": 12, "document_id": "book-b", "chapter_ids": ["ch-12"], "objective_ids": ["obj-12"], "lecture_id": "lecture-14-12", "section_pack_id": null },
+    { "week": 13, "document_id": "book-b", "chapter_ids": ["ch-13"], "objective_ids": ["obj-13"], "lecture_id": "lecture-14-13", "section_pack_id": null },
+    { "week": 14, "document_id": "book-b", "chapter_ids": ["ch-14"], "objective_ids": ["obj-14"], "lecture_id": "lecture-14-14", "section_pack_id": null }
+  ],
+  "schedule_items": [
+    { "schedule_item_id": "schedule-14-1", "week": 1, "sequence": 1, "session_type": "lecture", "artifact_id": "lecture-14-1", "starts_at": "2026-09-01T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-2", "week": 2, "sequence": 2, "session_type": "lecture", "artifact_id": "lecture-14-2", "starts_at": "2026-09-08T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-3", "week": 3, "sequence": 3, "session_type": "lecture", "artifact_id": "lecture-14-3", "starts_at": "2026-09-15T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-4", "week": 4, "sequence": 4, "session_type": "lecture", "artifact_id": "lecture-14-4", "starts_at": "2026-09-22T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-5", "week": 5, "sequence": 5, "session_type": "lecture", "artifact_id": "lecture-14-5", "starts_at": "2026-09-29T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-6", "week": 6, "sequence": 6, "session_type": "lecture", "artifact_id": "lecture-14-6", "starts_at": "2026-10-06T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-7", "week": 7, "sequence": 7, "session_type": "lecture", "artifact_id": "lecture-14-7", "starts_at": "2026-10-13T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-8", "week": 8, "sequence": 8, "session_type": "lecture", "artifact_id": "lecture-14-8", "starts_at": "2026-10-20T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-9", "week": 9, "sequence": 9, "session_type": "lecture", "artifact_id": "lecture-14-9", "starts_at": "2026-10-27T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-10", "week": 10, "sequence": 10, "session_type": "lecture", "artifact_id": "lecture-14-10", "starts_at": "2026-11-03T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-11", "week": 11, "sequence": 11, "session_type": "lecture", "artifact_id": "lecture-14-11", "starts_at": "2026-11-10T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-12", "week": 12, "sequence": 12, "session_type": "lecture", "artifact_id": "lecture-14-12", "starts_at": "2026-11-17T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-13", "week": 13, "sequence": 13, "session_type": "lecture", "artifact_id": "lecture-14-13", "starts_at": "2026-11-24T09:00:00Z", "status": "ready" },
+    { "schedule_item_id": "schedule-14-14", "week": 14, "sequence": 14, "session_type": "lecture", "artifact_id": "lecture-14-14", "starts_at": "2026-12-01T09:00:00Z", "status": "ready" }
+  ]
+}

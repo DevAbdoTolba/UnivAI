@@ -1,0 +1,5 @@
+{
+  "schema_version": "signed-spoken-name-metadata-v1", "learner_id": "usr_a", "tenant_id": "tenant-a", "session_id": "session", "lecture_id": "lecture", "approved_plan_id": "plan", "approved_plan_version": 1, "safe_spoken_name": "Sara", "name_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "nonce": "nonce-00000000000001",
+  "issued_at": "2026-09-01T10:00:00Z", "expires_at": "2026-09-01T09:00:00Z",
+  "signature": { "algorithm": "EdDSA", "key_id": "key", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+}

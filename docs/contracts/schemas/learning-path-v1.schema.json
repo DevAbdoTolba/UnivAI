@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/contracts/learning-path-v1.schema.json",
+  "title": "LearningPathV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "path_id", "path_version", "parent_path_version", "tenant_id", "collection_id", "status", "ordered_books", "prerequisite_edges", "warnings", "approval", "created_at"],
+  "properties": {
+    "schema_version": { "const": "learning-path-v1" },
+    "path_id": { "type": "string", "minLength": 1 },
+    "path_version": { "type": "integer", "minimum": 1 },
+    "parent_path_version": { "type": ["integer", "null"], "minimum": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "collection_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["proposed", "needs_review", "approved"] },
+    "ordered_books": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["position", "document_id", "title", "starts_at_chapter", "chapter_ids", "week_start", "week_end"],
+        "properties": {
+          "position": { "type": "integer", "minimum": 1 },
+          "document_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "starts_at_chapter": { "const": 1 },
+          "chapter_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "week_start": { "type": "integer", "minimum": 1 },
+          "week_end": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "prerequisite_edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_document_id", "to_document_id", "confidence", "rationale", "evidence"],
+        "properties": {
+          "from_document_id": { "type": "string", "minLength": 1 },
+          "to_document_id": { "type": "string", "minLength": 1 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "rationale": { "type": "string", "minLength": 1 },
+          "evidence": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["role", "document_id", "page_start", "page_end", "section", "passage_ids"],
+              "properties": {
+                "role": { "enum": ["prerequisite", "dependent"] },
+                "document_id": { "type": "string", "minLength": 1 },
+                "page_start": { "type": "integer", "minimum": 1 },
+                "page_end": { "type": "integer", "minimum": 1 },
+                "section": { "type": "string", "minLength": 1 },
+                "passage_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "resolved", "alternatives"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "resolved": { "type": "boolean" },
+          "alternatives": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved_version", "approved_by", "approved_at", "override_reason"],
+      "properties": {
+        "approved_version": { "type": ["integer", "null"], "minimum": 1 },
+        "approved_by": { "type": ["string", "null"] },
+        "approved_at": { "type": ["string", "null"], "format": "date-time" },
+        "override_reason": { "type": ["string", "null"] }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

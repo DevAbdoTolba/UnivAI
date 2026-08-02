@@ -1,0 +1,18 @@
+{
+  "schema_version": "content-artifact-v1",
+  "content_key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "original_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "pipeline_fingerprint": {
+    "parser": "pymupdf@1.26.3",
+    "chunker": "semantic-800-v2",
+    "embedding_model": "jina-embeddings-v2-base-en@sha256:2026a",
+    "vector_schema": "qdrant-multivector-v2",
+    "contract": "content-artifact-v1"
+  },
+  "state": "ready",
+  "byte_length": 1048576,
+  "page_count": 420,
+  "artifact_checksum": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "storage_ref": "artifact://rag/aa/shared-ddia-v1",
+  "created_at": "2026-08-02T09:00:00Z"
+}

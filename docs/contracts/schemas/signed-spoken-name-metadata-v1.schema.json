@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/contracts/signed-spoken-name-metadata-v1.schema.json",
+  "title": "SignedSpokenNameMetadataV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "learner_id", "tenant_id", "session_id", "lecture_id", "approved_plan_id", "approved_plan_version", "safe_spoken_name", "name_digest", "nonce", "issued_at", "expires_at", "signature"],
+  "properties": {
+    "schema_version": { "const": "signed-spoken-name-metadata-v1" },
+    "learner_id": { "type": "string", "pattern": "^usr_[A-Za-z0-9_-]+$" },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "lecture_id": { "type": "string", "minLength": 1 },
+    "approved_plan_id": { "type": "string", "minLength": 1 },
+    "approved_plan_version": { "type": "integer", "minimum": 1 },
+    "safe_spoken_name": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[^\\u0000-\\u001F\\u007F]+$" },
+    "name_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nonce": { "type": "string", "minLength": 16 },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": { "enum": ["EdDSA", "HS256"] },
+        "key_id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 32 }
+      }
+    }
+  }
+}

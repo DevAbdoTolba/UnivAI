@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/contracts/publication-receipt-v1.schema.json",
+  "title": "PublicationReceiptV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "package_id", "package_version", "package_hash", "kind", "tenant_id", "status", "published_assessment_id", "published_version", "defects", "audit_event_id", "processed_at"],
+  "properties": {
+    "schema_version": { "const": "publication-receipt-v1" },
+    "receipt_id": { "type": "string", "minLength": 1 },
+    "package_id": { "type": "string", "minLength": 1 },
+    "package_version": { "type": "integer", "minimum": 1 },
+    "package_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "kind": { "enum": ["quiz", "midterm", "final"] },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["accepted", "rejected"] },
+    "published_assessment_id": { "type": ["string", "null"] },
+    "published_version": { "type": ["integer", "null"], "minimum": 1 },
+    "defects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "question_id", "field", "message", "retryable"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "question_id": { "type": ["string", "null"] },
+          "field": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 },
+          "retryable": { "type": "boolean" }
+        }
+      }
+    },
+    "audit_event_id": { "type": "string", "minLength": 1 },
+    "processed_at": { "type": "string", "format": "date-time" }
+  }
+}

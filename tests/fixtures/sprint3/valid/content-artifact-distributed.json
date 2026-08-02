@@ -1,0 +1,11 @@
+{
+  "schema_version": "content-artifact-v1",
+  "content_key": "sha256:3434343434343434343434343434343434343434343434343434343434343434.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "original_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+  "pipeline_fingerprint": {
+    "parser": "pymupdf@1.26.3", "chunker": "semantic-800-v2", "embedding_model": "jina-embeddings-v2-base-en@sha256:2026a", "vector_schema": "qdrant-multivector-v2", "contract": "content-artifact-v1"
+  },
+  "state": "ready", "byte_length": 1572864, "page_count": 380,
+  "artifact_checksum": "7878787878787878787878787878787878787878787878787878787878787878",
+  "storage_ref": "artifact://rag/34/distributed-systems-v1", "created_at": "2026-08-02T09:04:00Z"
+}

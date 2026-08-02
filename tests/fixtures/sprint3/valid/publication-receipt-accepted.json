@@ -1,0 +1,9 @@
+{
+  "schema_version": "publication-receipt-v1",
+  "receipt_id": "receipt-quiz-week-2",
+  "package_id": "quiz-package-week-2", "package_version": 1,
+  "package_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+  "kind": "quiz", "tenant_id": "tenant-a", "status": "accepted",
+  "published_assessment_id": "assessment-quiz-week-2", "published_version": 1,
+  "defects": [], "audit_event_id": "audit-publish-quiz-2", "processed_at": "2026-09-08T12:01:00Z"
+}

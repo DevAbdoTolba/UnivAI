@@ -1,0 +1,44 @@
+{
+  "schema_version": "learning-path-v1",
+  "path_id": "path-tenant-a-001",
+  "path_version": 2,
+  "parent_path_version": 1,
+  "tenant_id": "tenant-a",
+  "collection_id": "collection-a",
+  "status": "approved",
+  "ordered_books": [
+    { "position": 1, "document_id": "book-foundations", "title": "Systems Foundations", "starts_at_chapter": 1, "chapter_ids": ["foundations-ch1", "foundations-ch2"], "week_start": 1, "week_end": 2 },
+    { "position": 2, "document_id": "book-databases", "title": "Database Internals", "starts_at_chapter": 1, "chapter_ids": ["databases-ch1", "databases-ch2", "databases-ch3"], "week_start": 3, "week_end": 5 },
+    { "position": 3, "document_id": "book-distributed", "title": "Distributed Systems", "starts_at_chapter": 1, "chapter_ids": ["distributed-ch1", "distributed-ch2"], "week_start": 6, "week_end": 7 }
+  ],
+  "prerequisite_edges": [
+    {
+      "from_document_id": "book-foundations",
+      "to_document_id": "book-databases",
+      "confidence": 0.94,
+      "rationale": "The database text assumes durable storage and process fundamentals.",
+      "evidence": [
+        { "role": "prerequisite", "document_id": "book-foundations", "page_start": 88, "page_end": 94, "section": "Durability and processes", "passage_ids": ["passage-foundations-88"] },
+        { "role": "dependent", "document_id": "book-databases", "page_start": 11, "page_end": 12, "section": "Assumed systems knowledge", "passage_ids": ["passage-db-11"] }
+      ]
+    },
+    {
+      "from_document_id": "book-databases",
+      "to_document_id": "book-distributed",
+      "confidence": 0.91,
+      "rationale": "The distributed text builds on replication and transaction concepts.",
+      "evidence": [
+        { "role": "prerequisite", "document_id": "book-databases", "page_start": 201, "page_end": 218, "section": "Replication", "passage_ids": ["passage-db-201"] },
+        { "role": "dependent", "document_id": "book-distributed", "page_start": 6, "page_end": 8, "section": "Prerequisite concepts", "passage_ids": ["passage-dist-6"] }
+      ]
+    }
+  ],
+  "warnings": [],
+  "approval": {
+    "approved_version": 2,
+    "approved_by": "usr_reviewer_a",
+    "approved_at": "2026-08-02T10:00:00Z",
+    "override_reason": null
+  },
+  "created_at": "2026-08-02T09:30:00Z"
+}

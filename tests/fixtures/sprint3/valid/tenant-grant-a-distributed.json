@@ -1,0 +1,5 @@
+{
+  "schema_version": "tenant-document-grant-v1", "grant_id": "grant-tenant-a-distributed", "tenant_id": "tenant-a", "collection_id": "collection-a", "document_id": "book-distributed",
+  "content_key": "sha256:3434343434343434343434343434343434343434343434343434343434343434.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "display": { "filename": "distributed-systems.pdf", "title": "Distributed Systems" }, "status": "active", "granted_at": "2026-08-02T09:06:00Z", "revoked_at": null
+}

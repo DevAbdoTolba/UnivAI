@@ -1,0 +1,5 @@
+{
+  "schema_version": "tenant-document-grant-v1", "grant_id": "grant-tenant-a-databases", "tenant_id": "tenant-a", "collection_id": "collection-a", "document_id": "book-databases",
+  "content_key": "sha256:1212121212121212121212121212121212121212121212121212121212121212.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "display": { "filename": "database-internals.pdf", "title": "Database Internals" }, "status": "active", "granted_at": "2026-08-02T09:05:00Z", "revoked_at": null
+}

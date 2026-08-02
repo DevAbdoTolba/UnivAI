@@ -1,0 +1,11 @@
+{
+  "schema_version": "content-artifact-v1",
+  "content_key": "sha256:1212121212121212121212121212121212121212121212121212121212121212.pipeline:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "original_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+  "pipeline_fingerprint": {
+    "parser": "pymupdf@1.26.3", "chunker": "semantic-800-v2", "embedding_model": "jina-embeddings-v2-base-en@sha256:2026a", "vector_schema": "qdrant-multivector-v2", "contract": "content-artifact-v1"
+  },
+  "state": "ready", "byte_length": 2097152, "page_count": 510,
+  "artifact_checksum": "5656565656565656565656565656565656565656565656565656565656565656",
+  "storage_ref": "artifact://rag/12/database-internals-v1", "created_at": "2026-08-02T09:03:00Z"
+}

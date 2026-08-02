@@ -1,0 +1,5 @@
+{
+  "schema_version": "section-session-meta-v1", "session_id": "bad-session", "tenant_id": "tenant-a", "learner_id": "usr_a", "programme_id": "programme-a", "course_id": "course-a", "week": 1, "lecture_id": "lecture-1", "section_pack_id": "section-1", "approved_plan_id": "plan", "approved_plan_version": 1, "state": "guided_task",
+  "resume": { "activity_id": "activity-1", "step_index": -1, "todo_acknowledged": false, "event_version": 0 },
+  "issued_at": "2026-09-01T09:00:00Z", "expires_at": "2026-09-01T10:00:00Z"
+}

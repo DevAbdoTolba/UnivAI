@@ -207,3 +207,19 @@ CREATE INDEX IF NOT EXISTS grades_student_idx   ON grades   (student_id);
 CREATE INDEX IF NOT EXISTS qa_log_student_idx   ON qa_log   (student_id);
 -- (Referential FKs to "user"("studentId") with ON DELETE CASCADE are a later
 -- hardening step; ownership is enforced in the app layer today.)
+
+-- ===========================================================================
+-- Versioned Core migrations
+--
+-- `make schema` and `./run.ps1 schema` apply this base schema followed by every
+-- migration below, in order. Keep the migration files as the single source of
+-- truth for post-MVP-1 contracts instead of copying their tables into this file.
+--
+--   infra/migrations/002_final_mvp.sql
+--   infra/migrations/003_sprint3_learning_flow.sql
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS core_schema_migrations (
+  version     INTEGER PRIMARY KEY,
+  name        TEXT NOT NULL UNIQUE,
+  applied_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

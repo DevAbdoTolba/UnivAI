@@ -1,0 +1,11 @@
+{
+  "schema_version": "cross-service-envelope-v1",
+  "request_id": "request-publish-quiz-2", "trace_id": "trace-publish-quiz-2", "operation": "assessment.publish",
+  "actor": { "tenant_id": "tenant-a", "learner_id": "usr_learner_a", "auth_context_id": "auth-session-a" },
+  "target": { "service": "exam", "resource_id": "quiz-package-week-2", "expected_version": 1 },
+  "idempotency": { "key": "publish-quiz-week-2-v1", "request_hash": "9999999999999999999999999999999999999999999999999999999999999999" },
+  "provenance": { "contract": "AssessmentPackage", "contract_version": "assessment-package-v1", "approved_plan_id": "plan-tenant-a-7", "approved_plan_version": 4, "producer": "agent" },
+  "audit": { "event_id": "audit-request-publish-quiz-2", "occurred_at": "2026-09-08T12:00:30Z" },
+  "payload": { "package_id": "quiz-package-week-2", "package_version": 1 },
+  "error": null
+}
