@@ -1,0 +1,35 @@
+{
+	admin off
+}
+
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	@health path /health /health/*
+	handle @health {
+		reverse_proxy health:8080
+	}
+
+	@livekit path /livekit/*
+	handle @livekit {
+		uri strip_prefix /livekit
+		reverse_proxy livekit:7880
+	}
+
+	handle {
+		reverse_proxy app:3100
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

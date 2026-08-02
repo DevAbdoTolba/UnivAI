@@ -14,6 +14,7 @@ set. Always report which model actually served the request.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import urllib.error
@@ -23,6 +24,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from services.observability.tracing import log_event, span, trace_headers
+from services.security.input_guard import (
+    InputRejected,
+    OutputLimitExceeded,
+    enforce_output_limit,
+    validate_input,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
 
@@ -31,6 +40,9 @@ load_dotenv(ROOT / ".env")
 # minutes. 30s on the long calls meant every attempt died mid-generation.
 TIMEOUT_QA_S = 30
 TIMEOUT_GENERATION_S = 600
+MAX_LLM_INPUT_CHARS = int(os.getenv("LLM_MAX_INPUT_CHARS", "100000"))
+MAX_LLM_OUTPUT_CHARS = int(os.getenv("LLM_MAX_OUTPUT_CHARS", "24000"))
+LOGGER = logging.getLogger("univai.llm")
 
 
 class LLMError(RuntimeError):
@@ -47,7 +59,9 @@ def _post_json(url: str, payload: dict, headers: dict[str, str], timeout: float)
     body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
-    for key, value in headers.items():
+    outbound_headers = trace_headers()
+    outbound_headers.update(headers)
+    for key, value in outbound_headers.items():
         req.add_header(key, value)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -247,6 +261,11 @@ def complete(
 
     force_spec skips the failover order and asks exactly that model — used when a
     caller has decided the primary's OUTPUT (not its availability) is the problem."""
+    try:
+        prompt = validate_input(prompt, max_chars=MAX_LLM_INPUT_CHARS)
+    except InputRejected as exc:
+        raise LLMError(f"input rejected ({exc.code}): {exc}") from exc
+
     primary = os.getenv("LLM_PRIMARY", "").strip()
     fallback = os.getenv("LLM_FALLBACK", "").strip()
     if not primary and not force_spec:
@@ -258,12 +277,21 @@ def complete(
         attempts = 2 if spec == primary else 1  # primary gets one retry
         for attempt in range(attempts):
             try:
-                text = _dispatch(spec, system, prompt, max_tokens, timeout_s)
-                print(f"[llm] served by {spec}", flush=True)
+                with span("llm.complete", logger=LOGGER, model=spec):
+                    text = _dispatch(spec, system, prompt, max_tokens, timeout_s)
+                    enforce_output_limit(text, max_chars=MAX_LLM_OUTPUT_CHARS)
+                log_event(LOGGER, logging.INFO, "llm.served", model=spec)
                 return LLMResult(text=text, model_used=spec)
-            except LLMError as exc:
+            except (LLMError, OutputLimitExceeded) as exc:
                 errors.append(f"{spec} (try {attempt + 1}): {exc}")
-                print(f"[llm] FAILED {spec} (try {attempt + 1}): {exc}", flush=True)
+                log_event(
+                    LOGGER,
+                    logging.ERROR,
+                    "llm.failed",
+                    model=spec,
+                    attempt=attempt + 1,
+                    error_type=type(exc).__name__,
+                )
                 if attempt + 1 < attempts:
                     time.sleep(1)
 
