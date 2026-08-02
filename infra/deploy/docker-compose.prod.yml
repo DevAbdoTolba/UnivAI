@@ -1,0 +1,217 @@
+x-log-policy: &log-policy
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-service-policy: &service-policy
+  restart: unless-stopped
+  init: true
+  logging: *log-policy
+  networks: [backend]
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    logging: *log-policy
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_started
+      health:
+        condition: service_healthy
+    networks: [edge, backend]
+
+  app:
+    <<: *service-policy
+    image: ${UNIVAI_APP_IMAGE:-ghcr.io/devabdotolba/univai-app:mvp2}
+    environment:
+      NODE_ENV: production
+      PORT: "3100"
+      DATABASE_URL: postgresql://univai:${POSTGRES_PASSWORD}@postgres:5432/univai
+      RAG_MCP_URL: http://agent:8000/mcp
+      EXAM_SYSTEM_URL: http://exam:3200
+      LIVEKIT_URL: ws://livekit:7880
+      NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN:-localhost}/livekit
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      BETTER_AUTH_URL: https://${DOMAIN:-localhost}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+      TRACE_HEADER: traceparent
+      REQUEST_ID_HEADER: X-Request-ID
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    expose: ["3100"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agent:
+        condition: service_started
+      exam:
+        condition: service_started
+
+  agent:
+    <<: *service-policy
+    image: ${UNIVAI_AGENT_IMAGE:-ghcr.io/devabdotolba/univai-agent:mvp2}
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      REQUEST_ID_HEADER: X-Request-ID
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    expose: ["8000"]
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  live:
+    <<: *service-policy
+    image: ${UNIVAI_LIVE_IMAGE:-ghcr.io/devabdotolba/univai-live:mvp2}
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+      RAG_MCP_URL: http://agent:8000/mcp
+      REQUEST_ID_HEADER: X-Request-ID
+      LOG_PRIVATE_AUDIO: "false"
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      livekit:
+        condition: service_healthy
+      agent:
+        condition: service_started
+
+  exam:
+    <<: *service-policy
+    image: ${UNIVAI_EXAM_IMAGE:-ghcr.io/devabdotolba/univai-exam:mvp2}
+    environment:
+      NODE_ENV: production
+      PORT: "3200"
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-univai}:${MONGO_ROOT_PASSWORD}@mongo:27017/univai_exams?authSource=admin
+      UNIVAI_APP_URL: https://${DOMAIN:-localhost}
+      REQUEST_ID_HEADER: X-Request-ID
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    expose: ["3200"]
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  health:
+    <<: *service-policy
+    image: ${UNIVAI_CORE_IMAGE:-ghcr.io/devabdotolba/univai-core:mvp2}
+    command: ["python", "-m", "services.health"]
+    environment:
+      SERVICE_NAME: univai
+      HEALTH_PORT: "8080"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      HEALTH_DEPENDENCIES_JSON: >-
+        [{"name":"app","url":"tcp://app:3100","required":true},
+        {"name":"agent","url":"tcp://agent:8000","required":true},
+        {"name":"exam","url":"tcp://exam:3200","required":false},
+        {"name":"livekit","url":"tcp://livekit:7880","required":true}]
+    expose: ["8080"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=2)"
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    logging: *log-policy
+    environment:
+      POSTGRES_USER: univai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: univai
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U univai -d univai"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    restart: unless-stopped
+    logging: *log-policy
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  mongo:
+    image: mongo:7.0.21
+    restart: unless-stopped
+    logging: *log-policy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-univai}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand('ping').ok ? 0 : 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  livekit:
+    image: livekit/livekit-server:v1.13.1
+    restart: unless-stopped
+    logging: *log-policy
+    environment:
+      LIVEKIT_CONFIG: >-
+        {"port":7880,"rtc":{"tcp_port":7881,"port_range_start":50000,
+        "port_range_end":50100,"use_external_ip":true},
+        "keys":{"${LIVEKIT_API_KEY:-}":"${LIVEKIT_API_SECRET:-}"}}
+    ports:
+      - "7881:7881/tcp"
+      - "50000-50100:50000-50100/udp"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+networks:
+  edge:
+  backend:
+
+volumes:
+  caddy-data:
+  caddy-config:
+  postgres-data:
+  qdrant-data:
+  mongo-data:

@@ -31,6 +31,9 @@ import asyncio
 
 from dotenv import load_dotenv
 
+from services.observability.tracing import trace_headers
+from services.security.input_guard import InputRejected, validate_input
+
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
 
@@ -95,7 +98,10 @@ async def _call_tool_inner(tool: str, arguments: dict, leash: float) -> str:
     # and the default 5-minute sse_read_timeout hangs up in the middle — which
     # makes their server abort the whole ingest.
     async with streamablehttp_client(
-        RAG_MCP_URL, timeout=leash, sse_read_timeout=leash
+        RAG_MCP_URL,
+        headers=trace_headers(),
+        timeout=leash,
+        sse_read_timeout=leash,
     ) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -140,6 +146,12 @@ async def search_book(query: str, top_k: int = 5, user_id: str | None = None) ->
     that one student's book. Falls back to RAG_USER_ID only when a caller has
     not been threaded through yet (single-tenant legacy).
     """
+    try:
+        query = validate_input(query)
+    except InputRejected as exc:
+        raise ValueError(f"query rejected ({exc.code}): {exc}") from exc
+    if not 1 <= top_k <= 20:
+        raise ValueError("top_k must be between 1 and 20")
     formatted = await _call_tool(
         RAG_TOOL_SEARCH,
         {
