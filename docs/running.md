@@ -45,7 +45,7 @@ docker compose -f infra/docker-compose.yml up -d
 |---|---|---|
 | `univai-db` (Postgres) | **5433** | app data + the virtual clock |
 | `univai-qdrant` | 6333 | the RAG's vectors (the book's index) |
-| `univai-mongo` | 27017 | the exam system's world |
+| `univai-mongo` | **27018** (container 27017) | the exam system's world |
 
 First time only, apply the schema: `make schema` (or `./run.ps1 schema`).
 
@@ -105,10 +105,16 @@ this itself — you only need it if you hand-edited `lectures/week-N/slides.md`.
 
 ```bash
 make up      # containers + schema
-make dev     # RAG + app + worker + exams, each in its own window
+make dev     # check prerequisites, then start RAG + app + worker + exams
 ```
 
 Windows without `make`: `./run.ps1 up ; ./run.ps1 dev` — same names, same behaviour.
+
+`dev` never starts or recreates containers and never downloads models. If a
+prerequisite is missing, it exits with the exact earlier command to run. On
+Linux, service output is kept in `logs/app.log`, `logs/exams.log`,
+`logs/worker.log`, and `logs/rag-mcp.log`.
+
 
 ## Is everything up?
 

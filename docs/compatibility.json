@@ -29,7 +29,7 @@
     "livekit": 7880,
     "postgres": 5433,
     "qdrant": 6333,
-    "mongo": 27017
+    "mongo": 27018
   },
   "note": "Working-tree standalone implementations must be reviewed and merged in their owner repositories before these gitlinks can be updated."
 }
