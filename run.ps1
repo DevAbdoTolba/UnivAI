@@ -255,7 +255,7 @@ $RagMcp     = "http://localhost:$RagPort/mcp"
 # Probed over 127.0.0.1, not localhost: the server binds IPv4 only, and a
 # localhost lookup that answers ::1 first wastes the timeout before falling back.
 $RagProbe   = "http://127.0.0.1:$RagPort/mcp"
-$QdrantUrl  = "http://localhost:6333"
+$QdrantUrl  = "http://127.0.0.1:6333"
 $RagLog     = "logs/rag-mcp.log"
 $RagOutLog  = "logs/rag-mcp.out.log"
 $RagPidFile = "logs/rag-mcp.pid"
