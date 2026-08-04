@@ -54,7 +54,8 @@ async def main() -> int:
         print(json.dumps({"ok": False, "error": str(exc)}))
         return 1
     except Exception as exc:  # server down, tool renamed, protocol error
-        print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
+        import traceback
+        print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}"}))
         return 1
 
     # Their tools report failures in the payload rather than by raising.
