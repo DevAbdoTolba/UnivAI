@@ -18,7 +18,15 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # services/, for common.*
+# The CLI is executed by filename, so Python otherwise exposes only
+# services/rag-tools on sys.path. `common.*` needs services/, while the shared
+# observability/security imports inside it need the campus repository root.
+CAMPUS_ROOT = Path(__file__).resolve().parents[2]
+SERVICES_ROOT = CAMPUS_ROOT / "services"
+for import_root in (SERVICES_ROOT, CAMPUS_ROOT):
+    value = str(import_root)
+    if value not in sys.path:
+        sys.path.insert(0, value)
 
 from common.rag_client import ingest_file, RagUnavailable  # noqa: E402
 
