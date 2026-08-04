@@ -74,7 +74,7 @@ class RagUnavailable(RuntimeError):
 RAG_TIMEOUT_S = float(os.getenv("RAG_TIMEOUT_S", "15"))
 # Measured: a 600-page textbook took their embedder ~29 minutes on this box,
 # and their server kills the whole ingest if the client hangs up early.
-RAG_INGEST_TIMEOUT_S = float(os.getenv("RAG_INGEST_TIMEOUT_S", "3300"))
+RAG_INGEST_TIMEOUT_S = float(os.getenv("RAG_INGEST_TIMEOUT_S", "10800"))
 
 
 async def _call_tool(tool: str, arguments: dict, timeout: float | None = None) -> str:
