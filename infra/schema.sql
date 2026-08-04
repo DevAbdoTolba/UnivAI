@@ -217,6 +217,7 @@ CREATE INDEX IF NOT EXISTS qa_log_student_idx   ON qa_log   (student_id);
 --
 --   infra/migrations/002_final_mvp.sql
 --   infra/migrations/003_sprint3_learning_flow.sql
+--   infra/migrations/004_app_library.sql
 -- ===========================================================================
 CREATE TABLE IF NOT EXISTS core_schema_migrations (
   version     INTEGER PRIMARY KEY,

@@ -192,7 +192,9 @@ function Target-Schema {
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING;" | Out-Null
     Invoke-Sql "infra/migrations/003_sprint3_learning_flow.sql"
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Write-Host "base schema and migrations 002-003 applied" -ForegroundColor Green
+    Invoke-Sql "infra/migrations/004_app_library.sql"
+    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    Write-Host "base schema and migrations 002-004 applied" -ForegroundColor Green
 }
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }

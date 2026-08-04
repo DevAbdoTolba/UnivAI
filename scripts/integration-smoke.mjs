@@ -38,6 +38,27 @@ function inspectContainer(name, failures) {
   }
 }
 
+function inspectPostgresRelations(names, failures) {
+  try {
+    const quoted = names.map((name) => `'${name}'`).join(", ");
+    const sql =
+      `SELECT table_name FROM information_schema.tables ` +
+      `WHERE table_schema = 'public' AND table_name IN (${quoted}) ORDER BY table_name;`;
+    const raw = execFileSync(
+      "docker",
+      ["exec", "univai-db", "psql", "-U", "univai", "-d", "univai", "-At", "-c", sql],
+      { encoding: "utf8" }
+    );
+    const present = new Set(raw.trim().split(/\r?\n/).filter(Boolean));
+    const missing = names.filter((name) => !present.has(name));
+    if (missing.length) throw new Error(`missing relations: ${missing.join(", ")}`);
+    console.log(`PASS App PostgreSQL relations: ${names.join(", ")}`);
+  } catch (error) {
+    failures.push(`App PostgreSQL relations: ${error.message}`);
+    console.error(`FAIL App PostgreSQL relations: ${error.message}`);
+  }
+}
+
 async function main() {
   const root = process.cwd();
   const failures = [];
@@ -68,6 +89,7 @@ async function main() {
   ]) {
     inspectContainer(container, failures);
   }
+  inspectPostgresRelations(["collections", "documents", "programmes"], failures);
   await probe("App readiness", "http://127.0.0.1:3100/api/health", failures, (text) => {
     const data = JSON.parse(text);
     return data.ok === true && data.ready === true;

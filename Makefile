@@ -292,7 +292,9 @@ schema: ## Apply infra/schema.sql (idempotent)
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING" > /dev/null
 	@$(DB) < infra/migrations/003_sprint3_learning_flow.sql > /dev/null
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@echo "base schema and migrations 002-003 applied"
+	@$(DB) < infra/migrations/004_app_library.sql > /dev/null
+	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING" > /dev/null
+	@echo "base schema and migrations 002-004 applied"
 
 migrate: schema ## Apply database migrations/schema
 
