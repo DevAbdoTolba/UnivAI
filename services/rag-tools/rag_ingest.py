@@ -3,7 +3,7 @@
 The Next.js /upload route spawns this. The RAG service ingests by absolute file
 path over MCP (ingest_file), so there is no HTTP upload endpoint to POST to.
 
-    python services/rag-tools/rag_ingest.py "D:/path/to/book.pdf" [student_id]
+    python services/rag-tools/rag_ingest.py "D:/path/to/book.pdf" [student_id] [collection_id]
 
 The optional student_id namespaces the book to one learner in the RAG service
 (multi-tenant). Omit it for the single-tenant fallback (RAG_USER_ID).
@@ -28,22 +28,28 @@ for import_root in (SERVICES_ROOT, CAMPUS_ROOT):
     if value not in sys.path:
         sys.path.insert(0, value)
 
-from common.rag_client import ingest_file, RagUnavailable  # noqa: E402
+from common.rag_client import ingest_collection, ingest_file, RagUnavailable  # noqa: E402
 
 
 async def main() -> int:
     if len(sys.argv) < 2:
-        print(json.dumps({"ok": False, "error": "usage: rag_ingest.py <absolute_pdf_path>"}))
+        print(json.dumps({"ok": False, "error": "usage: rag_ingest.py <absolute_pdf_path> [student_id] [collection_id]"}))
         return 2
 
     path = Path(sys.argv[1]).resolve()
     user_id = sys.argv[2] if len(sys.argv) > 2 else None
+    collection_id = sys.argv[3] if len(sys.argv) > 3 else None
     if not path.exists():
         print(json.dumps({"ok": False, "error": f"file not found: {path}"}))
         return 2
 
     try:
-        message = await ingest_file(str(path), user_id)
+        if collection_id:
+            if not user_id:
+                raise ValueError("student_id is required when collection_id is provided")
+            message = await ingest_collection([str(path)], collection_id, user_id)
+        else:
+            message = await ingest_file(str(path), user_id)
     except RagUnavailable as exc:
         print(json.dumps({"ok": False, "error": str(exc)}))
         return 1
@@ -51,8 +57,14 @@ async def main() -> int:
         print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
         return 1
 
-    # Their tool reports failures in the message text rather than by raising.
+    # Their tools report failures in the payload rather than by raising.
     ok = "Error" not in message and "Failed" not in message
+    if collection_id:
+        try:
+            report = json.loads(message)
+            ok = bool(report.get("succeeded")) and not report.get("failed")
+        except json.JSONDecodeError:
+            ok = False
     print(json.dumps({"ok": ok, "message": message}))
     return 0 if ok else 1
 

@@ -41,6 +41,8 @@ RAG_MCP_URL = os.getenv("RAG_MCP_URL", "").strip()
 RAG_USER_ID = os.getenv("RAG_USER_ID", "student")
 RAG_TOOL_SEARCH = os.getenv("RAG_TOOL_SEARCH", "retrieve_context")
 RAG_TOOL_INGEST = os.getenv("RAG_TOOL_INGEST", "ingest_file")
+RAG_TOOL_INGEST_COLLECTION = os.getenv("RAG_TOOL_INGEST_COLLECTION", "ingest_collection")
+RAG_TOOL_PLAN = os.getenv("RAG_TOOL_PLAN", "create_programme_plan")
 # Reranked cross-encoder scores; below this we treat a hit as noise, not evidence.
 RAG_MIN_SCORE = float(os.getenv("RAG_MIN_SCORE", "0"))
 
@@ -170,5 +172,39 @@ async def ingest_file(absolute_path: str, user_id: str | None = None) -> str:
     return await _call_tool(
         RAG_TOOL_INGEST,
         {"file_path": absolute_path, "user_id": user_id or RAG_USER_ID},
+        timeout=RAG_INGEST_TIMEOUT_S,
+    )
+
+
+async def ingest_collection(
+    absolute_paths: list[str], collection_id: str, user_id: str
+) -> str:
+    """Index books with the collection identity required by grounded planning."""
+    return await _call_tool(
+        RAG_TOOL_INGEST_COLLECTION,
+        {
+            "file_paths": absolute_paths,
+            "collection_id": collection_id,
+            "user_id": user_id,
+        },
+        timeout=RAG_INGEST_TIMEOUT_S,
+    )
+
+
+async def create_programme_plan(
+    programme_title: str,
+    collection_id: str,
+    user_id: str,
+    seed_queries: list[str],
+) -> str:
+    """Ask the Agent service to build a grounded plan for one collection."""
+    return await _call_tool(
+        RAG_TOOL_PLAN,
+        {
+            "programme_title": programme_title,
+            "collection_id": collection_id,
+            "user_id": user_id,
+            "seed_queries": seed_queries,
+        },
         timeout=RAG_INGEST_TIMEOUT_S,
     )
