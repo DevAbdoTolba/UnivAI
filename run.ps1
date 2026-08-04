@@ -488,7 +488,7 @@ function Target-Status {
     docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
 
     $appUp   = Test-Url "http://localhost:$AppPort/api/clock"
-    $examsUp = Test-Url "http://localhost:3200"
+    $examsUp = Test-Url "http://127.0.0.1:3200"
     $ragUp   = Test-TcpPort $RagPort
     $qdrantUp = Test-QdrantReady
     $lkUp    = Test-Url "http://127.0.0.1:7880"

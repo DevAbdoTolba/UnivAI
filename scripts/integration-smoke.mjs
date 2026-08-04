@@ -2,13 +2,14 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 
-async function probe(name, url, failures, validate = () => true) {
+async function probe(name, url, failures, validate = () => true, expectedStatus = null) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
     const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
     const text = await response.text();
-    if (!response.ok || !validate(text)) throw new Error(`${response.status} ${text.slice(0, 160)}`);
+    const accepted = expectedStatus === null ? response.ok : response.status === expectedStatus;
+    if (!accepted || !validate(text)) throw new Error(`${response.status} ${text.slice(0, 160)}`);
     console.log(`PASS ${name}: ${url}`);
   } catch (error) {
     failures.push(`${name}: ${error.message}`);
@@ -77,17 +78,14 @@ async function main() {
     return data.ok === true && data.ready === true;
   });
   await probe(
-    "Exam deterministic seeded read",
+    "Exam unauthenticated attempt read fails closed",
     "http://127.0.0.1:3200/api/exams/64b000000000000000000021",
     failures,
     (text) => {
       const data = JSON.parse(text);
-      return (
-        data._id === "64b000000000000000000021" &&
-        data.taken === false &&
-        Array.isArray(data.generated_questions)
-      );
-    }
+      return data.error === "Exam access token is required";
+    },
+    401
   );
   await probe("LiveKit signalling", "http://127.0.0.1:7880", failures);
 
