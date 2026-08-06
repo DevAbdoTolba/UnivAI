@@ -69,7 +69,7 @@ function Target-Help {
         @("install","Install missing system tools: node, python, uv, docker, ollama"),
         @("setup",  "Install everything: node deps, python venv, RAG deps"),
         @("env",    "Create .env from .env.example if missing"),
-        @("models", "Download the voice models + the one local LLM (gemma3:1b)"),
+        @("models", "Download the voice models + the one local LLM (qwen3:4b-instruct)"),
         @("up",     "Start Postgres + Qdrant, apply the schema"),
         @("down",   "Stop the containers and the RAG server (data is kept)"),
         @("schema", "Apply infra/schema.sql (idempotent)"),
@@ -132,7 +132,7 @@ function Target-Install {
 }
 
 # One light local model, no fallback (LLM_FALLBACK stays empty in .env).
-$ModelsLlm  = "gemma3:1b"
+$ModelsLlm  = "qwen3:4b-instruct"
 $KokoroUrl  = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
 $PiperUrl   = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium"
 
@@ -195,7 +195,11 @@ function Target-Schema {
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING;" | Out-Null
     Invoke-Sql "infra/migrations/003_sprint3_learning_flow.sql"
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Write-Host "base schema and migrations 002-003 applied" -ForegroundColor Green
+    Invoke-Sql "infra/migrations/004_app_library.sql"
+    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    Invoke-Sql "infra/migrations/005_lecture_artifact_keys.sql"
+    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (5, 'lecture_artifact_keys') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    Write-Host "base schema and migrations 002-005 applied" -ForegroundColor Green
 }
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }
@@ -258,7 +262,7 @@ $RagMcp     = "http://localhost:$RagPort/mcp"
 # Probed over 127.0.0.1, not localhost: the server binds IPv4 only, and a
 # localhost lookup that answers ::1 first wastes the timeout before falling back.
 $RagProbe   = "http://127.0.0.1:$RagPort/mcp"
-$QdrantUrl  = "http://localhost:6333"
+$QdrantUrl  = "http://127.0.0.1:6333"
 $RagLog     = "logs/rag-mcp.log"
 $RagOutLog  = "logs/rag-mcp.out.log"
 $RagPidFile = "logs/rag-mcp.pid"
@@ -535,7 +539,7 @@ function Target-Status {
     docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
 
     $appUp   = Test-Url "http://localhost:$AppPort/api/clock"
-    $examsUp = Test-Url "http://localhost:3200"
+    $examsUp = Test-Url "http://127.0.0.1:3200"
     $ragUp   = Test-TcpPort $RagPort
     $qdrantUp = Test-QdrantReady
     $lkUp    = Test-Url "http://127.0.0.1:7880"

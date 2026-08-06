@@ -16,7 +16,14 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # services/, for common.*
+# Keep direct CLI execution compatible with both `common.*` and the
+# repository-root `services.*` imports used by shared instrumentation.
+CAMPUS_ROOT = Path(__file__).resolve().parents[2]
+SERVICES_ROOT = CAMPUS_ROOT / "services"
+for import_root in (SERVICES_ROOT, CAMPUS_ROOT):
+    value = str(import_root)
+    if value not in sys.path:
+        sys.path.insert(0, value)
 
 from common.rag_client import _call_tool, RAG_USER_ID, RagUnavailable  # noqa: E402
 

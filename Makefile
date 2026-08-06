@@ -258,9 +258,12 @@ setup: env ## Install everything: node deps, python venv, exam deps, RAG deps
 env: ## Create .env from .env.example if it does not exist
 	@test -f .env || (cp .env.example .env && echo "Created .env — defaults run fully local, no keys needed")
 
-# One light local model, no fallback (LLM_FALLBACK stays empty in .env).
+# One local model, no fallback (LLM_FALLBACK stays empty in .env). Sub-2B models
+# (gemma3:1b, qwen2.5:0.5b) cannot hold the JSON schema course generation asks
+# for — they fail every retry with "model never produced valid JSON" — so the
+# default is the smallest model measured to survive it.
 # Swap with:  make models MODELS_LLM=gemma3:4b
-MODELS_LLM ?= gemma3:1b
+MODELS_LLM ?= qwen3:4b-instruct
 KOKORO_URL := https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
 PIPER_URL  := https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium
 
@@ -297,7 +300,11 @@ schema: ## Apply infra/schema.sql (idempotent)
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING" > /dev/null
 	@$(DB) < infra/migrations/003_sprint3_learning_flow.sql > /dev/null
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@echo "base schema and migrations 002-003 applied"
+	@$(DB) < infra/migrations/004_app_library.sql > /dev/null
+	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING" > /dev/null
+	@$(DB) < infra/migrations/005_lecture_artifact_keys.sql > /dev/null
+	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (5, 'lecture_artifact_keys') ON CONFLICT (version) DO NOTHING" > /dev/null
+	@echo "base schema and migrations 002-005 applied"
 
 migrate: schema ## Apply database migrations/schema
 
