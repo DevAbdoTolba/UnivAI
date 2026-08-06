@@ -20,6 +20,8 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $Compose = @("compose", "-f", "infra/docker-compose.yml")
+$MongoPort = 27018
+$env:MONGO_PORT = "$MongoPort"
 $Py      = ".\.venv\Scripts\python.exe"
 $Pip     = ".\.venv\Scripts\pip.exe"
 
@@ -90,7 +92,7 @@ function Target-Help {
         @("worker", "Run the live-lecture voice agent (needs LIVEKIT_* keys)"),
         @("exams",  "Run the exam system (:3200)"),
         @("slides", "Build the Slidev decks to UnivAI-app/public/slides/"),
-        @("dev",    "Start infra, then RAG + app + worker in separate windows"),
+        @("dev",    "Check prerequisites, then start RAG + app + worker + exams"),
         @("dev-integration","Explicit full integrated-stack alias"),
         @("status", "Show what is running"),
         @("clean",  "Remove containers AND volumes (destroys the DB and the vectors)")
@@ -174,12 +176,13 @@ function Target-Setup {
 }
 
 function Target-Up {
-    docker @Compose up -d
+    docker @Compose up -d --wait --wait-timeout 120
+    if ($LASTEXITCODE -ne 0) { throw "Infrastructure failed to become healthy" }
     Say "waiting for Postgres"
     do { Start-Sleep -Milliseconds 700 }
     until (docker exec univai-db pg_isready -U univai -d univai 2>$null)
     Target-Schema
-    Write-Host "Postgres :5433   Qdrant :6333   Mongo :27017   LiveKit :7880" -ForegroundColor Green
+    Write-Host "Postgres :5433   Qdrant :6333   Mongo :$MongoPort   LiveKit :7880" -ForegroundColor Green
 }
 
 # Both stop the RAG server first: it is detached, so taking its Qdrant away
@@ -297,6 +300,11 @@ function Target-RagDb {
 # $Wait = 0 starts the server and returns immediately (what `dev` does).
 function Target-Rag([int]$Wait = 300) {
     Target-RagDb
+    Target-RagServer -Wait $Wait
+}
+
+# Process-only RAG launcher used by dev after infrastructure is verified.
+function Target-RagServer([int]$Wait = 300) {
     if (Test-RagEndpoint) {
         if (Get-RagListenerProcess) {
             Write-Host "RAG MCP server is already answering on :$RagPort" -ForegroundColor Green
@@ -452,10 +460,49 @@ function Target-RagCacheClean {
 function Target-App    { Push-Location UnivAI-app; npx next dev -p $AppPort; Pop-Location }
 function Target-Worker { & $Py UnivAI-live/worker.py dev }
 function Target-Slides { node scripts/build-slides.mjs }
-function Target-Exams  { Push-Location UnivAI-exam_system; npm run dev; Pop-Location }
+function Target-Exams  { Push-Location UnivAI-exam_system; node --env-file=../.env --import tsx server.ts dev; Pop-Location }
+
+function Assert-DevPrerequisites {
+    $setupPaths = @(".env", $Py, "UnivAI-app/node_modules", "UnivAI-exam_system/node_modules", "UnivAI-Agent/.venv")
+    $missing = @($setupPaths | Where-Object { -not (Test-Path $_) })
+    if ($missing.Count -gt 0) {
+        throw "Project setup is incomplete (missing: $($missing -join ', ')). Run: ./run.ps1 install ; ./run.ps1 setup"
+    }
+
+    $modelPaths = @(
+        "UnivAI-live/models/kokoro/kokoro-v1.0.onnx",
+        "UnivAI-live/models/kokoro/voices-v1.0.bin",
+        "UnivAI-live/models/piper/en_US-lessac-medium.onnx",
+        "UnivAI-live/models/piper/en_US-lessac-medium.onnx.json"
+    )
+    $missing = @($modelPaths | Where-Object { -not (Test-Path $_) })
+    if ($missing.Count -gt 0) {
+        throw "Model setup is incomplete (missing: $($missing -join ', ')). Run: ./run.ps1 models"
+    }
+
+    docker info *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker is not running. Start Docker, then run: ./run.ps1 up"
+    }
+
+    $notReady = @()
+    foreach ($container in @("univai-db", "univai-qdrant", "univai-mongo", "univai-livekit")) {
+        $state = docker inspect --format "{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" $container 2>$null
+        if ($LASTEXITCODE -ne 0 -or $state -ne "running/healthy") {
+            $notReady += "$container($(if ($state) { $state } else { 'missing' }))"
+        }
+    }
+    $published = docker port univai-mongo 27017/tcp 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not ($published -match ":$MongoPort$")) {
+        $notReady += "univai-mongo(host-port-not-published)"
+    }
+    if ($notReady.Count -gt 0) {
+        throw "Development infrastructure is not ready: $($notReady -join ', '). Run: ./run.ps1 up"
+    }
+}
 
 function Target-Dev {
-    Target-Up
+    Assert-DevPrerequisites
     if (-not (Test-Url "http://127.0.0.1:11434")) {
         Say "waking Ollama"
         $ollama = Get-Command ollama -ErrorAction SilentlyContinue
@@ -474,7 +521,7 @@ function Target-Dev {
     Say "launching RAG, app and worker in separate windows"
     $root = $PSScriptRoot
     # RAG detaches itself and logs to a file, so it needs no window and no wait.
-    Target-Rag -Wait 0
+    Target-RagServer -Wait 0
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort"
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 worker"
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams"

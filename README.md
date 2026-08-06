@@ -18,14 +18,16 @@ One PDF goes in. Out comes a living four-week semester:
 ## Quick start
 
 ```bash
-make setup   # one time: installs everything
+make install # system tools
+make setup   # project dependencies and .env
+make models  # voice files and local LLM
 make up      # Postgres + Qdrant + Mongo containers
-make dev     # RAG + app + exams + voice worker, each in its own window
+make dev     # check prerequisites, then start the application services
 ```
 
 Then open **http://localhost:3100** → upload a book on `/upload` → drive time from `/admin`.
 
-No `make` on Windows? Same targets: `./run.ps1 setup ; ./run.ps1 up ; ./run.ps1 dev`
+No `make` on Windows? The same target order works through `./run.ps1`.
 
 ## How it flows
 

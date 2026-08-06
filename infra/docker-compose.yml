@@ -63,7 +63,8 @@ services:
     container_name: univai-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      # Host 27018 avoids a locally installed MongoDB already using 27017.
+      - "${MONGO_PORT:-27018}:27017"
     volumes:
       - univai-mongo:/data/db
     healthcheck:

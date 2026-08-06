@@ -34,6 +34,8 @@ install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data
 else
 
 COMPOSE  := docker compose -f infra/docker-compose.yml
+MONGO_PORT ?= 27018
+export MONGO_PORT
 # SYSPY: whatever python the machine has (ubuntu ships python3 only, some
 # windows only the py launcher). Its single job is creating the venv;
 # after that everything goes through $(PY), and pip is always $(PY) -m pip.
@@ -93,7 +95,7 @@ export PATH := $(WINDOWS_NODE_DIR):$(PATH)
 endif
 endif
 
-.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean
+.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-server rag-db rag-down rag-logs rag-stop app worker exams slides dev-check dev dev-integration status clean
 
 help: ## Show this help
 	@echo ""
@@ -267,6 +269,11 @@ PIPER_URL  := https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/
 
 # The voice model files belong to the Mouth cave (UnivAI-live), not the campus root.
 VOICE_DIR := UnivAI-live/models
+VOICE_MODELS := \
+	$(VOICE_DIR)/kokoro/kokoro-v1.0.onnx \
+	$(VOICE_DIR)/kokoro/voices-v1.0.bin \
+	$(VOICE_DIR)/piper/en_US-lessac-medium.onnx \
+	$(VOICE_DIR)/piper/en_US-lessac-medium.onnx.json
 
 models: ## Download the voice models + the one local LLM (MODELS_LLM)
 	@mkdir -p $(VOICE_DIR)/kokoro $(VOICE_DIR)/piper
@@ -280,11 +287,9 @@ models: ## Download the voice models + the one local LLM (MODELS_LLM)
 # ---------------------------------------------------------------- infrastructure
 
 up: ## Start Postgres + Qdrant + Mongo, then apply the schema
-	$(COMPOSE) up -d
-	@echo "==> waiting for Postgres"
-	@until docker exec univai-db pg_isready -U univai -d univai >/dev/null 2>&1; do sleep 1; done
+	$(COMPOSE) up -d --wait --wait-timeout 120
 	@$(MAKE) --no-print-directory schema
-	@echo "Postgres :5433   Qdrant :6333   Mongo :27017   LiveKit :7880"
+	@echo "Postgres :5433   Qdrant :6333   Mongo :$(MONGO_PORT)   LiveKit :7880"
 
 down: rag-stop ## Stop Postgres + Qdrant + the RAG server (data is kept)
 	$(COMPOSE) down
@@ -340,7 +345,11 @@ reset: ## Wipe lectures, attendance, grades, Q&A and reset the virtual clock
 
 # ---------------------------------------------------------------- the three processes
 
-rag: rag-db ## Start the whole RAG stack — Qdrant + the MCP server, in the background
+rag: rag-db rag-server ## Start the whole RAG stack — Qdrant + the MCP server, in the background
+
+# Start only the RAG process. dev uses this after dev-check has proved that
+# make up already started Qdrant; it must not mutate infrastructure itself.
+rag-server:
 	@mkdir -p logs
 	@set -u; \
 	running="$$($(RAG_PIDS))"; \
@@ -454,7 +463,7 @@ worker: ## Run the live-lecture voice agent (TTS + STT). Needs LIVEKIT_* keys
 	$(PY) UnivAI-live/worker.py dev
 
 exams: ## Run the exam system (UnivAI-exam_system) - :3200
-	cd UnivAI-exam_system && npm run dev
+	cd UnivAI-exam_system && node --env-file=../.env --import tsx server.ts dev
 
 slides: ## Build the Slidev decks to UnivAI-app/public/slides/
 	node scripts/build-slides.mjs
@@ -469,8 +478,48 @@ rag-cache-clean: ## Remove broken RAG Jina embedding model cache
 
 # ---------------------------------------------------------------- everything at once
 
-dev: up ## Start infra, then RAG + app + worker + exams, each in its own terminal
-	@echo "==> launching RAG, app, worker and exams in separate windows"
+dev-check:
+	@set -eu; \
+	missing=""; \
+	for path in .env $(PY) UnivAI-app/node_modules UnivAI-exam_system/node_modules UnivAI-Agent/.venv; do \
+		[ -e "$$path" ] || missing="$$missing $$path"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "ERROR: project setup is incomplete (missing:$$missing)."; \
+		echo "Run: make install && make setup"; \
+		exit 1; \
+	fi; \
+	missing=""; \
+	for path in $(VOICE_MODELS); do \
+		[ -s "$$path" ] || missing="$$missing $$path"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "ERROR: model setup is incomplete (missing:$$missing)."; \
+		echo "Run: make models"; \
+		exit 1; \
+	fi; \
+	if ! docker info >/dev/null 2>&1; then \
+		echo "ERROR: Docker is not running."; \
+		echo "Start Docker, then run: make up"; \
+		exit 1; \
+	fi; \
+	missing=""; \
+	for container in univai-db univai-qdrant univai-mongo univai-livekit; do \
+		state="$$(docker inspect --format '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$$container" 2>/dev/null || true)"; \
+		[ "$$state" = "running/healthy" ] || missing="$$missing $$container($${state:-missing})"; \
+	done; \
+	if ! docker port univai-mongo 27017/tcp 2>/dev/null | grep -Eq ':$(MONGO_PORT)$$'; then \
+		missing="$$missing univai-mongo(host-port-not-published)"; \
+	fi; \
+	if [ -n "$$missing" ]; then \
+		echo "ERROR: development infrastructure is not ready:$$missing"; \
+		echo "Run: make up"; \
+		exit 1; \
+	fi; \
+	echo "development prerequisites are ready"
+
+dev: dev-check ## Start RAG + app + worker + exams; requires setup, models and infra
+	@echo "==> launching RAG, app, worker and exams"
 ifeq ($(OS),Windows_NT)
 # On Windows the ollama CLI starts the daemon app when it is not running.
 	@curl -s -m 2 http://127.0.0.1:11434 >/dev/null 2>&1 || (echo "==> waking Ollama" && ollama list >/dev/null 2>&1)
@@ -481,9 +530,84 @@ ifeq ($(OS),Windows_NT)
 	@start "UnivAI worker" cmd //k ".venv\Scripts\python.exe UnivAI-live\worker.py dev"
 	@start "UnivAI exams"  //D UnivAI-exam_system cmd //k "npm run dev"
 else
-# RAG detaches itself and logs to a file, so it needs no window and no wait.
-	@$(MAKE) --no-print-directory rag RAG_WAIT=0
-	@($(MAKE) app &) ; ($(MAKE) worker &) ; ($(MAKE) exams &)
+	@mkdir -p logs
+	@$(MAKE) --no-print-directory rag-server RAG_WAIT=0
+	@set -u; \
+	release_owned_listener() { \
+		port="$$1"; expected_cwd="$$2"; label="$$3"; target="$$4"; root="$(abspath .)"; \
+		pids="$$(fuser "$$port/tcp" 2>/dev/null || true)"; \
+		[ -n "$$pids" ] || return 0; \
+		for pid in $$pids; do \
+			cwd="$$(readlink -f /proc/$$pid/cwd 2>/dev/null || true)"; \
+			command="$$(ps -o comm= -p $$pid 2>/dev/null || true)"; \
+			if [ "$$cwd" != "$$expected_cwd" ]; then \
+				echo "ERROR: :$$port is held by pid $$pid outside this checkout ($$cwd)."; \
+				echo "Stop that process, then rerun: make dev"; \
+				return 1; \
+			fi; \
+			case "$$command" in next-server*) ;; *) \
+				echo "ERROR: :$$port is held by unexpected owned process '$$command' (pid $$pid)."; \
+				return 1;; \
+			esac; \
+			owned="$$pid"; ancestor="$$(ps -o ppid= -p $$pid 2>/dev/null | tr -d ' ')"; \
+			while [ -n "$$ancestor" ] && [ "$$ancestor" -gt 1 ]; do \
+				ancestor_cwd="$$(readlink -f /proc/$$ancestor/cwd 2>/dev/null || true)"; \
+				ancestor_args="$$(ps -o args= -p $$ancestor 2>/dev/null || true)"; \
+				if [ "$$ancestor_cwd" = "$$expected_cwd" ]; then \
+					owned="$$owned $$ancestor"; \
+				elif [ "$$ancestor_cwd" = "$$root" ]; then \
+					case "$$ancestor_args" in *make*" $$target"*) owned="$$owned $$ancestor";; *) break;; esac; \
+				else \
+					break; \
+				fi; \
+				ancestor="$$(ps -o ppid= -p $$ancestor 2>/dev/null | tr -d ' ')"; \
+			done; \
+			echo "==> stopping stale $$label listener on :$$port (owned pids:$$owned)"; \
+			kill -TERM $$owned; \
+		done; \
+		for i in $$(seq 1 20); do \
+			fuser "$$port/tcp" >/dev/null 2>&1 || return 0; \
+			sleep 0.25; \
+		done; \
+		echo "ERROR: stale $$label listener did not release :$$port"; \
+		return 1; \
+	}; \
+	if curl -sf -m 2 http://127.0.0.1:$(APP_PORT)/api/clock >/dev/null 2>&1; then \
+		echo "app is already answering on :$(APP_PORT)"; \
+	else \
+		release_owned_listener "$(APP_PORT)" "$(abspath UnivAI-app)" "app" "app" || exit 1; \
+		echo "==> starting app (log: logs/app.log)"; \
+		nohup setsid sh -c 'cd UnivAI-app && exec npx next dev -p $(APP_PORT)' </dev/null > logs/app.log 2>&1 & echo $$! > logs/app.pid; \
+	fi; \
+	if curl -sf -m 2 http://127.0.0.1:3200 >/dev/null 2>&1; then \
+		echo "exams are already answering on :3200"; \
+	else \
+		release_owned_listener "3200" "$(abspath UnivAI-exam_system)" "exam" "exams" || exit 1; \
+		echo "==> starting exams (log: logs/exams.log)"; \
+		nohup setsid sh -c 'cd UnivAI-exam_system && exec node --env-file=../.env --import tsx server.ts dev' </dev/null > logs/exams.log 2>&1 & echo $$! > logs/exams.pid; \
+	fi; \
+	worker=""; \
+	for pid in $$(pgrep -f 'UnivAI-live/[w]orker\.py dev' 2>/dev/null || true); do \
+		[ "$$(readlink -f /proc/$$pid/cwd 2>/dev/null)" = "$(abspath .)" ] || continue; \
+		worker="$$pid"; break; \
+	done; \
+	if [ -n "$$worker" ]; then \
+		echo "voice worker is already running (pid $$worker)"; \
+	else \
+		echo "==> starting voice worker (log: logs/worker.log)"; \
+		nohup setsid $(PY) UnivAI-live/worker.py dev </dev/null > logs/worker.log 2>&1 & echo $$! > logs/worker.pid; \
+	fi
+	@set -eu; \
+	for i in $$(seq 1 60); do \
+		curl -sf -m 2 http://127.0.0.1:$(APP_PORT)/api/clock >/dev/null 2>&1 && break; \
+		if [ "$$i" -eq 60 ]; then echo "ERROR: app failed to start. See logs/app.log"; exit 1; fi; \
+		sleep 1; \
+	done; \
+	for i in $$(seq 1 60); do \
+		curl -sf -m 2 http://127.0.0.1:3200 >/dev/null 2>&1 && break; \
+		if [ "$$i" -eq 60 ]; then echo "ERROR: exams failed to start. See logs/exams.log"; exit 1; fi; \
+		sleep 1; \
+	done
 endif
 	@echo ""
 	@echo "  app    http://localhost:$(APP_PORT)"
@@ -491,6 +615,7 @@ endif
 	@echo "  exams  http://localhost:3200"
 	@echo "  RAG    $(RAG_MCP)"
 	@echo ""
+	@echo "  logs   logs/app.log, logs/exams.log, logs/worker.log, $(RAG_LOG)"
 	@echo "  RAG runs detached — 'make rag-logs' to watch it, 'make rag-down' to stop it."
 	@echo ""
 	@echo "  Ollama wakes automatically on Windows. The course generator and"
