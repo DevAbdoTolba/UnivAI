@@ -18,8 +18,11 @@ from common.rag_client import RagUnavailable, create_programme_plan  # noqa: E40
 
 
 async def main() -> int:
-    if len(sys.argv) < 5:
-        print(json.dumps({"ok": False, "error": "usage: rag_plan.py <title> <collection_id> <student_id> <seed_query> [...]"}))
+    # Seed queries are optional: when a caller cannot name a subject area — every
+    # filename in the collection was pure numbering — the Agent falls back to the
+    # programme objective rather than being handed a query it would only refuse.
+    if len(sys.argv) < 4:
+        print(json.dumps({"ok": False, "error": "usage: rag_plan.py <title> <collection_id> <student_id> [seed_query ...]"}))
         return 2
 
     title, collection_id, student_id = sys.argv[1:4]
