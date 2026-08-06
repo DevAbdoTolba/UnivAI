@@ -192,7 +192,9 @@ function Target-Schema {
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING;" | Out-Null
     Invoke-Sql "infra/migrations/003_sprint3_learning_flow.sql"
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Write-Host "base schema and migrations 002-003 applied" -ForegroundColor Green
+    Invoke-Sql "infra/migrations/004_app_library.sql"
+    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    Write-Host "base schema and migrations 002-004 applied" -ForegroundColor Green
 }
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }
@@ -255,7 +257,7 @@ $RagMcp     = "http://localhost:$RagPort/mcp"
 # Probed over 127.0.0.1, not localhost: the server binds IPv4 only, and a
 # localhost lookup that answers ::1 first wastes the timeout before falling back.
 $RagProbe   = "http://127.0.0.1:$RagPort/mcp"
-$QdrantUrl  = "http://localhost:6333"
+$QdrantUrl  = "http://127.0.0.1:6333"
 $RagLog     = "logs/rag-mcp.log"
 $RagOutLog  = "logs/rag-mcp.out.log"
 $RagPidFile = "logs/rag-mcp.pid"
@@ -488,7 +490,7 @@ function Target-Status {
     docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
 
     $appUp   = Test-Url "http://localhost:$AppPort/api/clock"
-    $examsUp = Test-Url "http://localhost:3200"
+    $examsUp = Test-Url "http://127.0.0.1:3200"
     $ragUp   = Test-TcpPort $RagPort
     $qdrantUp = Test-QdrantReady
     $lkUp    = Test-Url "http://127.0.0.1:7880"

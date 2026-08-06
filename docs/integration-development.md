@@ -36,7 +36,7 @@ Set-Location UnivAI
 | `make contract-check` | `./run.ps1 contract-check` | Validate Agent MCP, lecture/quiz, Live messages, Exam webhook/policy, course-size, and environment contracts. |
 | `make sprint3-smoke` | `./run.ps1 sprint3-smoke` | Validate Sprint 3 schemas, canonical 3/7/14-week fixtures, and deterministic fail-closed journeys. Mock startup traces prove ordering only, never the latency SLO. |
 | `make seed-demo` | `./run.ps1 seed-demo` | Apply fixed PostgreSQL and MongoDB demo records for `S-2026-000042`, including a real Better Auth credential account. |
-| `make integration-smoke` | `./run.ps1 integration-smoke` | Run strict submodule/static gates, container health, App/Exam readiness, a seeded non-consuming Exam read, virtual clock, real Agent `server_info`, LiveKit signalling, and deterministic Live message validation with bounded timeouts. |
+| `make integration-smoke` | `./run.ps1 integration-smoke` | Run strict submodule/static gates, container and App-library schema health, App/Exam readiness, fail-closed Exam access, virtual clock, real Agent `server_info`, LiveKit signalling, and deterministic Live message validation with bounded timeouts. |
 | `make down` | `./run.ps1 down` | Stop containers and preserve volumes. |
 | `make clean` | `./run.ps1 clean` | Destructively remove local integration volumes. |
 
@@ -44,8 +44,9 @@ The deterministic smoke never invokes a real course LLM, camera, microphone,
 TTS, or STT model. Real-provider checks are optional and explicit.
 
 `make schema` and `./run.ps1 schema` apply the MVP-1 base followed by migrations
-`002_final_mvp.sql` and `003_sprint3_learning_flow.sql`. Applied versions are
-recorded in `core_schema_migrations`; all scripts remain idempotent.
+`002_final_mvp.sql`, `003_sprint3_learning_flow.sql`, and
+`004_app_library.sql`. Applied versions are recorded in
+`core_schema_migrations`; all scripts remain idempotent.
 
 ## Sprint 3 integrated gate
 
