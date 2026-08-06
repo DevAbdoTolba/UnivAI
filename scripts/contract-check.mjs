@@ -417,7 +417,11 @@ export function checkContracts(root = process.cwd()) {
         failures
       );
     }
-    requireMatch(agentLectureGen, /LECTURE_MINUTES_MIN\s*=\s*30/, "Agent lecture minimum drift", failures);
+    // 45, not 30: once a week split into a theoretical lecture and a section,
+    // the Agent raised the floor for the theoretical half (UnivAI-Agent
+    // 502e7c3). The Agent owns this constant — the app has no counterpart — so
+    // this assertion only has to follow it.
+    requireMatch(agentLectureGen, /LECTURE_MINUTES_MIN\s*=\s*45/, "Agent lecture minimum drift", failures);
     requireMatch(agentLectureGen, /LECTURE_MINUTES_MAX\s*=\s*120/, "Agent lecture maximum drift", failures);
     requireMatch(agentLectureGen, /MIN_LECTURE_QUESTIONS\s*=\s*15/, "Agent quiz-bank minimum drift", failures);
     requireMatch(appSemesterPlan, /MAX_SEMESTER_WEEKS\s*=\s*12/, "App semester maximum drift", failures);

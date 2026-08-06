@@ -15,13 +15,14 @@ next-env.d.ts
 # uploaded books (user data)
 uploads/
 
-# lecture content is generated from the uploaded book (services/lecture_gen.py)
-# and committed so the team can see the current course in git (see lectures/)
-
-# the lecturer's pre-rendered voice (services/prerender_audio.py) — binary,
-# regenerable from script.json in minutes
-lectures/*/audio/
-lectures/_prompts/
+# Generated course content — slides, scripts, quizzes, the lecturer's
+# pre-rendered voice, the semester plan. All of it is written by the course
+# builder (UnivAI-Agent/generation/lecture_gen.py) from a learner's uploaded
+# book, so it is per-learner data rather than source: it rebuilds from the book
+# and it churns on every regenerate. Only the README explaining the folder is
+# tracked, so a fresh clone still gets lectures/ and its documentation.
+lectures/*
+!lectures/README.md
 
 # all service + build logs live here (see docs/running.md)
 logs/
