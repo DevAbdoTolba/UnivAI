@@ -304,7 +304,9 @@ schema: ## Apply infra/schema.sql (idempotent)
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING" > /dev/null
 	@$(DB) < infra/migrations/005_lecture_artifact_keys.sql > /dev/null
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (5, 'lecture_artifact_keys') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@echo "base schema and migrations 002-005 applied"
+	@$(DB) < infra/migrations/006_resumable_course_generation.sql > /dev/null
+	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (6, 'resumable_course_generation') ON CONFLICT (version) DO NOTHING" > /dev/null
+	@echo "base schema and migrations 002-006 applied"
 
 migrate: schema ## Apply database migrations/schema
 

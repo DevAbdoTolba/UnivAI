@@ -202,7 +202,9 @@ function Target-Schema {
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING;" | Out-Null
     Invoke-Sql "infra/migrations/005_lecture_artifact_keys.sql"
     Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (5, 'lecture_artifact_keys') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Write-Host "base schema and migrations 002-005 applied" -ForegroundColor Green
+    Invoke-Sql "infra/migrations/006_resumable_course_generation.sql"
+    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (6, 'resumable_course_generation') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    Write-Host "base schema and migrations 002-006 applied" -ForegroundColor Green
 }
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }

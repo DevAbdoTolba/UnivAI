@@ -2,7 +2,7 @@
  * Build a student's premade Slidev decks to static HTML, served by the Next.js
  * app at /slides/<studentId>/week-N/ and embedded in the lecture page's iframe.
  *
- *   node scripts/build-slides.mjs <studentId>   # one student (multi-tenant)
+ *   node scripts/build-slides.mjs <studentId> [week-N] # one student/week
  *   node scripts/build-slides.mjs               # legacy global lectures/week-N
  *
  * Slidev is invoked via npx so it stays out of the app's dependency tree.
@@ -16,6 +16,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // A studentId (S-YYYY-NNNNNN) scopes the build to that learner's course.
 const sid = process.argv[2] || null;
+const requestedWeek = process.argv[3] || null;
 const LECTURES = sid ? path.join(ROOT, "lectures", sid) : path.join(ROOT, "lectures");
 const OUT = sid
   ? path.join(ROOT, "UnivAI-app", "public", "slides", sid)
@@ -29,7 +30,9 @@ if (!existsSync(LECTURES)) {
 
 mkdirSync(OUT, { recursive: true });
 
-const weeks = readdirSync(LECTURES).filter((name) => /^week-\d+$/.test(name));
+const weeks = readdirSync(LECTURES).filter(
+  (name) => /^week-\d+$/.test(name) && (!requestedWeek || name === requestedWeek),
+);
 if (!weeks.length) {
   console.error(`No week-N folders in ${path.relative(ROOT, LECTURES)}/.`);
   process.exit(1);
