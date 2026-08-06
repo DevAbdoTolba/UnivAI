@@ -95,7 +95,7 @@ export PATH := $(WINDOWS_NODE_DIR):$(PATH)
 endif
 endif
 
-.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-server rag-db rag-down rag-logs rag-stop app worker exams slides dev-check dev dev-integration status clean
+.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-server rag-db rag-down rag-logs rag-stop app worker exams slides dev-check dev dev-integration dev-stop dev-restart status clean
 
 help: ## Show this help
 	@echo ""
@@ -589,6 +589,7 @@ else
 	worker=""; \
 	for pid in $$(pgrep -f 'UnivAI-live/[w]orker\.py dev' 2>/dev/null || true); do \
 		[ "$$(readlink -f /proc/$$pid/cwd 2>/dev/null)" = "$(abspath .)" ] || continue; \
+		case "$$(ps -o comm= -p $$pid 2>/dev/null)" in python*) ;; *) continue;; esac; \
 		worker="$$pid"; break; \
 	done; \
 	if [ -n "$$worker" ]; then \
@@ -622,6 +623,49 @@ endif
 	@echo "  lecture Q&A call it at :11434 ($(MODELS_LLM) - one local model, no fallback)."
 
 dev-integration: dev ## Explicit alias for the full real local integration stack
+
+# `make dev` starts app, exams and worker detached with setsid, so each one is
+# its own process GROUP and the recorded pid is the group leader. Signalling the
+# group is what actually stops the server underneath — killing the pid alone
+# leaves the real next/node/python child orphaned and still holding its port.
+#
+# The trailing wait is for the worker specifically: its group leader dies first,
+# but livekit takes seconds more to unwind its child processes. `make dev` finds
+# the worker by pattern, so returning while one is still exiting makes it decide
+# a worker is already running and start none — leaving lectures with no voice.
+dev-stop: ## Stop app, exams and worker (containers and RAG keep running)
+	@set -u; \
+	for name in app exams worker; do \
+		pidfile="logs/$$name.pid"; \
+		if [ ! -f "$$pidfile" ]; then echo "  $$name  was not started by make dev"; continue; fi; \
+		pid="$$(cat "$$pidfile" 2>/dev/null || true)"; \
+		if [ -z "$$pid" ] || ! kill -0 "$$pid" 2>/dev/null; then \
+			echo "  $$name  not running"; rm -f "$$pidfile"; continue; \
+		fi; \
+		pgid="$$(ps -o pgid= -p "$$pid" 2>/dev/null | tr -d ' ')"; \
+		if [ -n "$$pgid" ]; then kill -TERM -"$$pgid" 2>/dev/null || true; else kill -TERM "$$pid" 2>/dev/null || true; fi; \
+		for i in $$(seq 1 24); do kill -0 "$$pid" 2>/dev/null || break; sleep 0.25; done; \
+		if kill -0 "$$pid" 2>/dev/null; then \
+			if [ -n "$$pgid" ]; then kill -KILL -"$$pgid" 2>/dev/null || true; else kill -KILL "$$pid" 2>/dev/null || true; fi; \
+		fi; \
+		rm -f "$$pidfile"; \
+		echo "  $$name  stopped"; \
+	done; \
+	for i in $$(seq 1 40); do \
+		alive=""; \
+		for p in $$(pgrep -f 'UnivAI-live/[w]orker\.py dev' 2>/dev/null || true); do \
+			[ "$$(readlink -f /proc/$$p/cwd 2>/dev/null)" = "$(abspath .)" ] && alive="$$p" && break; \
+		done; \
+		[ -z "$$alive" ] && break; \
+		sleep 0.25; \
+	done
+
+# The RAG server reads .env at import too, so an .env change needs it restarted
+# with the rest — that is the whole reason this target exists.
+dev-restart: ## Restart everything `make dev` runs — use after editing .env
+	@$(MAKE) --no-print-directory dev-stop
+	@$(MAKE) --no-print-directory rag-stop
+	@$(MAKE) --no-print-directory dev
 
 status: ## Show what is running
 	@echo "containers:" && docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"
