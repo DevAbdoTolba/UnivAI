@@ -403,39 +403,27 @@ export function checkContracts(root = process.cwd()) {
     path.join(root, "UnivAI-Agent", "generation", "lecture_gen.py"),
     "utf8"
   );
-  if (/MIN_LECTURE_QUESTIONS\s*=/.test(agentLectureGen)) {
-    const appSemesterPlan = readFileSync(
-      path.join(root, "UnivAI-app", "lib", "semester-plan.ts"),
-      "utf8"
+  const appSemesterPlan = readFileSync(
+    path.join(root, "UnivAI-app", "lib", "semester-plan.ts"),
+    "utf8"
+  );
+  const expectedQuizPapers = { XS: 5, S: 6, M: 10, L: 12, XL: 15 };
+  for (const [name, count] of Object.entries(expectedQuizPapers)) {
+    requireMatch(
+      appSizes,
+      new RegExp(`${name}:\\s*\\{\\s*quizPaper:\\s*${count}`),
+      `App assessment size drift: ${name}`,
+      failures
     );
-    const expectedQuizPapers = { XS: 5, S: 6, M: 10, L: 12, XL: 15 };
-    for (const [name, count] of Object.entries(expectedQuizPapers)) {
-      requireMatch(
-        appSizes,
-        new RegExp(`${name}:\\s*\\{\\s*quizPaper:\\s*${count}`),
-        `App assessment size drift: ${name}`,
-        failures
-      );
-    }
-    // 45, not 30: once a week split into a theoretical lecture and a section,
-    // the Agent raised the floor for the theoretical half (UnivAI-Agent
-    // 502e7c3). The Agent owns this constant — the app has no counterpart — so
-    // this assertion only has to follow it.
-    requireMatch(agentLectureGen, /LECTURE_MINUTES_MIN\s*=\s*45/, "Agent lecture minimum drift", failures);
-    requireMatch(agentLectureGen, /LECTURE_MINUTES_MAX\s*=\s*120/, "Agent lecture maximum drift", failures);
-    requireMatch(agentLectureGen, /MIN_LECTURE_QUESTIONS\s*=\s*15/, "Agent quiz-bank minimum drift", failures);
-    requireMatch(appSemesterPlan, /MAX_SEMESTER_WEEKS\s*=\s*12/, "App semester maximum drift", failures);
-  } else {
-    // Transitional compatibility until the Agent and App PRs that replace the
-    // shared lecture-size dial are both merged and their submodule pointers are
-    // advanced in this repository.
-    const agentSizes = readFileSync(path.join(root, "UnivAI-Agent", "contracts.py"), "utf8");
-    const expectedSlides = { XS: 3, S: 5, M: 8, L: 12, XL: 16 };
-    for (const [name, slides] of Object.entries(expectedSlides)) {
-      requireMatch(appSizes, new RegExp(`${name}:\\s*\\{\\s*slides:\\s*${slides}`), `App course size drift: ${name}`, failures);
-      requireMatch(agentSizes, new RegExp(`"${name}":\\s*\\{"slides":\\s*${slides}`), `Agent course size drift: ${name}`, failures);
-    }
   }
+  // 45, not 30: once a week split into a theoretical lecture and a section,
+  // the Agent raised the floor for the theoretical half (UnivAI-Agent
+  // 502e7c3). The Agent owns this constant — the app has no counterpart — so
+  // this assertion only has to follow it.
+  requireMatch(agentLectureGen, /LECTURE_MINUTES_MIN\s*=\s*45/, "Agent lecture minimum drift", failures);
+  requireMatch(agentLectureGen, /LECTURE_MINUTES_MAX\s*=\s*120/, "Agent lecture maximum drift", failures);
+  requireMatch(agentLectureGen, /MIN_LECTURE_QUESTIONS\s*=\s*15/, "Agent quiz-bank minimum drift", failures);
+  requireMatch(appSemesterPlan, /MAX_SEMESTER_WEEKS\s*=\s*12/, "App semester maximum drift", failures);
 
   const envExample = readFileSync(path.join(root, ".env.example"), "utf8");
   for (const variable of [
