@@ -619,7 +619,7 @@ endif
 	@echo "  RAG runs detached — 'make rag-logs' to watch it, 'make rag-down' to stop it."
 	@echo ""
 	@echo "  Ollama wakes automatically on Windows. The course generator and"
-	@echo "  lecture Q&A call it at :11434 (gemma3:1b - one light model, no fallback)."
+	@echo "  lecture Q&A call it at :11434 ($(MODELS_LLM) - one local model, no fallback)."
 
 dev-integration: dev ## Explicit alias for the full real local integration stack
 
