@@ -12,8 +12,8 @@ SHELL := /bin/bash
 ifeq ($(OS),Windows_NT)
 
 POWERSHELL ?= powershell
-WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean
-WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w
+WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration dev-stop dev-restart status clean
+WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w
 
 .PHONY: $(WIN_TARGETS) $(WIN_ALIAS_TARGETS) install-node node-check
 
@@ -22,13 +22,13 @@ help: ## Show this help
 	@echo.
 	@echo Windows aliases are also available: make up_w, make dev_w, make migrate_w, make seed_w, etc.
 
-install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean:
+install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration dev-stop dev-restart status clean:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $@
 
 install-node node-check:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 install
 
-install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w:
+install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $(patsubst %_w,%,$@)
 
 else
@@ -95,7 +95,7 @@ export PATH := $(WINDOWS_NODE_DIR):$(PATH)
 endif
 endif
 
-.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-server rag-db rag-down rag-logs rag-stop app worker exams slides dev-check dev dev-integration status clean
+.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-server rag-db rag-down rag-logs rag-stop app worker exams slides dev-check dev dev-integration dev-stop dev-restart status clean
 
 help: ## Show this help
 	@echo ""
@@ -304,7 +304,9 @@ schema: ## Apply infra/schema.sql (idempotent)
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING" > /dev/null
 	@$(DB) < infra/migrations/005_lecture_artifact_keys.sql > /dev/null
 	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (5, 'lecture_artifact_keys') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@echo "base schema and migrations 002-005 applied"
+	@$(DB) < infra/migrations/006_resumable_course_generation.sql > /dev/null
+	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (6, 'resumable_course_generation') ON CONFLICT (version) DO NOTHING" > /dev/null
+	@echo "base schema and migrations 002-006 applied"
 
 migrate: schema ## Apply database migrations/schema
 
@@ -589,6 +591,7 @@ else
 	worker=""; \
 	for pid in $$(pgrep -f 'UnivAI-live/[w]orker\.py dev' 2>/dev/null || true); do \
 		[ "$$(readlink -f /proc/$$pid/cwd 2>/dev/null)" = "$(abspath .)" ] || continue; \
+		case "$$(ps -o comm= -p $$pid 2>/dev/null)" in python*) ;; *) continue;; esac; \
 		worker="$$pid"; break; \
 	done; \
 	if [ -n "$$worker" ]; then \
@@ -619,9 +622,64 @@ endif
 	@echo "  RAG runs detached — 'make rag-logs' to watch it, 'make rag-down' to stop it."
 	@echo ""
 	@echo "  Ollama wakes automatically on Windows. The course generator and"
-	@echo "  lecture Q&A call it at :11434 (gemma3:1b - one light model, no fallback)."
+	@echo "  lecture Q&A call it at :11434 ($(MODELS_LLM) - one local model, no fallback)."
 
 dev-integration: dev ## Explicit alias for the full real local integration stack
+
+# `make dev` starts app, exams and worker detached with setsid, so each one is
+# its own process GROUP and the recorded pid is the group leader. Signalling the
+# group is what actually stops the server underneath — killing the pid alone
+# leaves the real next/node/python child orphaned and still holding its port.
+#
+# The trailing wait is for the worker specifically: its group leader dies first,
+# but livekit takes seconds more to unwind its child processes. `make dev` finds
+# the worker by pattern, so returning while one is still exiting makes it decide
+# a worker is already running and start none — leaving lectures with no voice.
+dev-stop: ## Stop app, exams and worker (containers and RAG keep running)
+	@set -u; \
+	for name in app exams worker; do \
+		pidfile="logs/$$name.pid"; \
+		if [ ! -f "$$pidfile" ]; then echo "  $$name  was not started by make dev"; continue; fi; \
+		pid="$$(cat "$$pidfile" 2>/dev/null || true)"; \
+		if [ -z "$$pid" ] || ! kill -0 "$$pid" 2>/dev/null; then \
+			echo "  $$name  not running"; rm -f "$$pidfile"; continue; \
+		fi; \
+		cwd="$$(readlink -f /proc/$$pid/cwd 2>/dev/null || true)"; \
+		args="$$(ps -o args= -p "$$pid" 2>/dev/null || true)"; \
+		owned=""; \
+		case "$$name" in \
+			app) [ "$$cwd" = "$(abspath UnivAI-app)" ] && case "$$args" in *next*dev*) owned=1;; esac;; \
+			exams) [ "$$cwd" = "$(abspath UnivAI-exam_system)" ] && case "$$args" in *server.ts*dev*) owned=1;; esac;; \
+			worker) [ "$$cwd" = "$(abspath .)" ] && case "$$args" in *UnivAI-live/worker.py*dev*) owned=1;; esac;; \
+		esac; \
+		if [ -z "$$owned" ]; then \
+			echo "  $$name  ignored stale pid $$pid (process is not owned by this checkout)"; \
+			rm -f "$$pidfile"; continue; \
+		fi; \
+		pgid="$$(ps -o pgid= -p "$$pid" 2>/dev/null | tr -d ' ')"; \
+		if [ -n "$$pgid" ]; then kill -TERM -"$$pgid" 2>/dev/null || true; else kill -TERM "$$pid" 2>/dev/null || true; fi; \
+		for i in $$(seq 1 24); do kill -0 "$$pid" 2>/dev/null || break; sleep 0.25; done; \
+		if kill -0 "$$pid" 2>/dev/null; then \
+			if [ -n "$$pgid" ]; then kill -KILL -"$$pgid" 2>/dev/null || true; else kill -KILL "$$pid" 2>/dev/null || true; fi; \
+		fi; \
+		rm -f "$$pidfile"; \
+		echo "  $$name  stopped"; \
+	done; \
+	for i in $$(seq 1 40); do \
+		alive=""; \
+		for p in $$(pgrep -f 'UnivAI-live/[w]orker\.py dev' 2>/dev/null || true); do \
+			[ "$$(readlink -f /proc/$$p/cwd 2>/dev/null)" = "$(abspath .)" ] && alive="$$p" && break; \
+		done; \
+		[ -z "$$alive" ] && break; \
+		sleep 0.25; \
+	done
+
+# The RAG server reads .env at import too, so an .env change needs it restarted
+# with the rest — that is the whole reason this target exists.
+dev-restart: ## Restart everything `make dev` runs — use after editing .env
+	@$(MAKE) --no-print-directory dev-stop
+	@$(MAKE) --no-print-directory rag-stop
+	@$(MAKE) --no-print-directory dev
 
 status: ## Show what is running
 	@echo "containers:" && docker ps --filter name=univai --format "  {{.Names}}  {{.Status}}  {{.Ports}}"

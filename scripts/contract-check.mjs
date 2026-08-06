@@ -399,11 +399,38 @@ export function checkContracts(root = process.cwd()) {
   }
 
   const appSizes = readFileSync(path.join(root, "UnivAI-app", "lib", "course-size.ts"), "utf8");
-  const agentSizes = readFileSync(path.join(root, "UnivAI-Agent", "contracts.py"), "utf8");
-  const expectedSlides = { XS: 3, S: 5, M: 8, L: 12, XL: 16 };
-  for (const [name, slides] of Object.entries(expectedSlides)) {
-    requireMatch(appSizes, new RegExp(`${name}:\\s*\\{\\s*slides:\\s*${slides}`), `App course size drift: ${name}`, failures);
-    requireMatch(agentSizes, new RegExp(`"${name}":\\s*\\{"slides":\\s*${slides}`), `Agent course size drift: ${name}`, failures);
+  const agentLectureGen = readFileSync(
+    path.join(root, "UnivAI-Agent", "generation", "lecture_gen.py"),
+    "utf8"
+  );
+  if (/MIN_LECTURE_QUESTIONS\s*=/.test(agentLectureGen)) {
+    const appSemesterPlan = readFileSync(
+      path.join(root, "UnivAI-app", "lib", "semester-plan.ts"),
+      "utf8"
+    );
+    const expectedQuizPapers = { XS: 5, S: 6, M: 10, L: 12, XL: 15 };
+    for (const [name, count] of Object.entries(expectedQuizPapers)) {
+      requireMatch(
+        appSizes,
+        new RegExp(`${name}:\\s*\\{\\s*quizPaper:\\s*${count}`),
+        `App assessment size drift: ${name}`,
+        failures
+      );
+    }
+    requireMatch(agentLectureGen, /LECTURE_MINUTES_MIN\s*=\s*30/, "Agent lecture minimum drift", failures);
+    requireMatch(agentLectureGen, /LECTURE_MINUTES_MAX\s*=\s*120/, "Agent lecture maximum drift", failures);
+    requireMatch(agentLectureGen, /MIN_LECTURE_QUESTIONS\s*=\s*15/, "Agent quiz-bank minimum drift", failures);
+    requireMatch(appSemesterPlan, /MAX_SEMESTER_WEEKS\s*=\s*12/, "App semester maximum drift", failures);
+  } else {
+    // Transitional compatibility until the Agent and App PRs that replace the
+    // shared lecture-size dial are both merged and their submodule pointers are
+    // advanced in this repository.
+    const agentSizes = readFileSync(path.join(root, "UnivAI-Agent", "contracts.py"), "utf8");
+    const expectedSlides = { XS: 3, S: 5, M: 8, L: 12, XL: 16 };
+    for (const [name, slides] of Object.entries(expectedSlides)) {
+      requireMatch(appSizes, new RegExp(`${name}:\\s*\\{\\s*slides:\\s*${slides}`), `App course size drift: ${name}`, failures);
+      requireMatch(agentSizes, new RegExp(`"${name}":\\s*\\{"slides":\\s*${slides}`), `Agent course size drift: ${name}`, failures);
+    }
   }
 
   const envExample = readFileSync(path.join(root, ".env.example"), "utf8");
@@ -440,7 +467,7 @@ function main() {
     failures.forEach((failure) => console.error(`FAIL: ${failure}`));
     process.exitCode = 1;
   } else {
-    console.log("PASS: Agent, App, Live, Exam, Sprint 3 schemas/fixtures, course-size, and environment contracts agree.");
+    console.log("PASS: Agent, App, Live, Exam, Sprint 3 schemas/fixtures, learning-shape, and environment contracts agree.");
   }
 }
 
