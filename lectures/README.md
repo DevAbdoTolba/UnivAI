@@ -14,11 +14,11 @@ week-N/
   quiz.json      the week's question bank — each question tagged
                  "lecture" (taught) or "self_study" (book-only, max 10% of a paper)
   audio/         the pre-recorded voice: s{segment}-t{sentence}.npy + meta.json
-                 (gitignored — regenerable in minutes)
+                 (regenerable in minutes)
 ```
 
 `_prompts/` — the personalized raise-hand lines ("Yes, <student>? …"), same
-voice as the lecture, also gitignored.
+voice as the lecture.
 
 ## Who reads what
 
@@ -27,5 +27,12 @@ voice as the lecture, also gitignored.
 - the **exam system** gets `quiz.json` synced into its Mongo question bank on
   every exam start
 
-Text content (`slides.md`, `script.json`, `quiz.json`) is committed so the
-team can see the current course in git; binary audio is not.
+## Not in git
+
+Nothing under here is tracked except this README. Everything else is a
+learner's own generated course — it rebuilds from their uploaded book, differs
+per student, and is rewritten on every regenerate, so committing it only
+produced churn and one learner's course in everyone's clone.
+
+A fresh clone therefore starts with an empty `lectures/`; the builder creates
+what it needs on the first run.
