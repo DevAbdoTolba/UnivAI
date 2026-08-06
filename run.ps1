@@ -4,6 +4,7 @@
 #   ./run.ps1 setup        install node deps, python venv, RAG deps
 #   ./run.ps1 up           start Postgres + Qdrant and apply the schema
 #   ./run.ps1 dev          start everything (RAG + app + worker), each in its own window
+#   ./run.ps1 dev-restart  restart the complete dev stack after editing .env
 #
 # Same target names as the Makefile. Keep the two in step.
 
@@ -93,6 +94,8 @@ function Target-Help {
         @("exams",  "Run the exam system (:3200)"),
         @("slides", "Build the Slidev decks to UnivAI-app/public/slides/"),
         @("dev",    "Check prerequisites, then start RAG + app + worker + exams"),
+        @("dev-stop","Stop app, worker and exams; keep RAG and containers running"),
+        @("dev-restart","Restart everything launched by dev"),
         @("dev-integration","Explicit full integrated-stack alias"),
         @("status", "Show what is running"),
         @("clean",  "Remove containers AND volumes (destroys the DB and the vectors)")
@@ -245,7 +248,10 @@ function Target-SeedDemo {
     Write-Host "integration demo seed applied" -ForegroundColor Green
 }
 function Target-SubmodulesCheck { node scripts/submodules-check.mjs }
-function Target-ContractCheck { node scripts/contract-check.mjs }
+function Target-ContractCheck {
+    node scripts/contract-check.mjs
+    if ($LASTEXITCODE -ne 0) { throw "Cross-repository contract check failed" }
+}
 function Target-Sprint3Smoke { node scripts/sprint3-smoke.mjs --mode mock }
 function Target-IntegrationSmoke { node scripts/integration-smoke.mjs }
 
@@ -520,11 +526,15 @@ function Target-Dev {
     }
     Say "launching RAG, app and worker in separate windows"
     $root = $PSScriptRoot
+    New-Item -ItemType Directory -Force -Path "logs" | Out-Null
     # RAG detaches itself and logs to a file, so it needs no window and no wait.
     Target-RagServer -Wait 0
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort"
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 worker"
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams"
+    $appProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" -PassThru
+    $workerProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 worker" -PassThru
+    $examProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams" -PassThru
+    $appProcess.Id | Set-Content "logs/app.pid"
+    $workerProcess.Id | Set-Content "logs/worker.pid"
+    $examProcess.Id | Set-Content "logs/exams.pid"
 
     Write-Host ""
     Write-Host "  app    http://localhost:$AppPort"           -ForegroundColor Green
@@ -532,6 +542,64 @@ function Target-Dev {
     Write-Host "  RAG    $RagMcp"
     Write-Host ""
     Write-Host "  RAG runs detached - './run.ps1 rag-logs' to watch it, './run.ps1 rag-down' to stop it." -ForegroundColor DarkGray
+}
+
+function Stop-DevProcess([string]$Name) {
+    $pidFile = Join-Path $PSScriptRoot "logs/$Name.pid"
+    if (-not (Test-Path -LiteralPath $pidFile)) {
+        Write-Host "  $Name  was not started by ./run.ps1 dev" -ForegroundColor DarkGray
+        return
+    }
+
+    $recorded = (Get-Content -LiteralPath $pidFile -Raw).Trim()
+    $processId = 0
+    if (-not [int]::TryParse($recorded, [ref]$processId)) {
+        Remove-Item -LiteralPath $pidFile -ErrorAction SilentlyContinue
+        Write-Host "  $Name  ignored invalid pid file" -ForegroundColor DarkGray
+        return
+    }
+
+    $rootProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
+    $rootPattern = [regex]::Escape($PSScriptRoot)
+    $targetPattern = [regex]::Escape("run.ps1 $Name")
+    if (-not $rootProcess -or -not $rootProcess.CommandLine -or
+        $rootProcess.CommandLine -notmatch $rootPattern -or
+        $rootProcess.CommandLine -notmatch $targetPattern) {
+        Remove-Item -LiteralPath $pidFile -ErrorAction SilentlyContinue
+        Write-Host "  $Name  ignored stale pid $processId (not owned by this checkout)" -ForegroundColor DarkGray
+        return
+    }
+
+    # Stop descendants before their recorded PowerShell parent so next/node and
+    # the worker cannot survive holding ports after the visible window closes.
+    $snapshot = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    $pending = [System.Collections.Generic.Queue[int]]::new()
+    $pending.Enqueue($processId)
+    $tree = [System.Collections.Generic.List[int]]::new()
+    while ($pending.Count -gt 0) {
+        $parentId = $pending.Dequeue()
+        $tree.Add($parentId)
+        foreach ($child in $snapshot | Where-Object { [int]$_.ParentProcessId -eq $parentId }) {
+            $pending.Enqueue([int]$child.ProcessId)
+        }
+    }
+    $ids = $tree.ToArray()
+    [array]::Reverse($ids)
+    foreach ($id in $ids) {
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -LiteralPath $pidFile -ErrorAction SilentlyContinue
+    Write-Host "  $Name  stopped" -ForegroundColor Yellow
+}
+
+function Target-DevStop {
+    foreach ($name in @("app", "exams", "worker")) { Stop-DevProcess $name }
+}
+
+function Target-DevRestart {
+    Target-DevStop
+    Target-RagStop
+    Target-Dev
 }
 
 function Target-Status {
@@ -586,6 +654,8 @@ switch ($Target.ToLower()) {
     "exams"  { Target-Exams }
     "slides" { Target-Slides }
     "dev"    { Target-Dev }
+    "dev-stop" { Target-DevStop }
+    "dev-restart" { Target-DevRestart }
     "dev-integration" { Target-Dev }
     "status" { Target-Status }
     "clean"  { Target-Clean }

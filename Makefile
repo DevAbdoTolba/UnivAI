@@ -12,8 +12,8 @@ SHELL := /bin/bash
 ifeq ($(OS),Windows_NT)
 
 POWERSHELL ?= powershell
-WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean
-WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w
+WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration dev-stop dev-restart status clean
+WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w
 
 .PHONY: $(WIN_TARGETS) $(WIN_ALIAS_TARGETS) install-node node-check
 
@@ -22,13 +22,13 @@ help: ## Show this help
 	@echo.
 	@echo Windows aliases are also available: make up_w, make dev_w, make migrate_w, make seed_w, etc.
 
-install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration status clean:
+install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration dev-stop dev-restart status clean:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $@
 
 install-node node-check:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 install
 
-install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w status_w clean_w:
+install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $(patsubst %_w,%,$@)
 
 else
@@ -641,6 +641,18 @@ dev-stop: ## Stop app, exams and worker (containers and RAG keep running)
 		pid="$$(cat "$$pidfile" 2>/dev/null || true)"; \
 		if [ -z "$$pid" ] || ! kill -0 "$$pid" 2>/dev/null; then \
 			echo "  $$name  not running"; rm -f "$$pidfile"; continue; \
+		fi; \
+		cwd="$$(readlink -f /proc/$$pid/cwd 2>/dev/null || true)"; \
+		args="$$(ps -o args= -p "$$pid" 2>/dev/null || true)"; \
+		owned=""; \
+		case "$$name" in \
+			app) [ "$$cwd" = "$(abspath UnivAI-app)" ] && case "$$args" in *next*dev*) owned=1;; esac;; \
+			exams) [ "$$cwd" = "$(abspath UnivAI-exam_system)" ] && case "$$args" in *server.ts*dev*) owned=1;; esac;; \
+			worker) [ "$$cwd" = "$(abspath .)" ] && case "$$args" in *UnivAI-live/worker.py*dev*) owned=1;; esac;; \
+		esac; \
+		if [ -z "$$owned" ]; then \
+			echo "  $$name  ignored stale pid $$pid (process is not owned by this checkout)"; \
+			rm -f "$$pidfile"; continue; \
 		fi; \
 		pgid="$$(ps -o pgid= -p "$$pid" 2>/dev/null | tr -d ' ')"; \
 		if [ -n "$$pgid" ]; then kill -TERM -"$$pgid" 2>/dev/null || true; else kill -TERM "$$pid" 2>/dev/null || true; fi; \
