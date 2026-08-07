@@ -433,7 +433,6 @@ export function checkContracts(root = process.cwd()) {
     "EXAM_SYSTEM_URL",
     "LIVEKIT_URL",
     "BETTER_AUTH_SECRET",
-    "LECTURES_DIR",
   ]) {
     requireMatch(envExample, new RegExp(`^${variable}=`, "m"), `Root env variable missing: ${variable}`, failures);
   }

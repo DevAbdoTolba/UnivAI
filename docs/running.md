@@ -88,18 +88,18 @@ The whole UI: `/upload`, `/schedule`, `/lecture/[id]`, `/exams`,
 
 Registers against the LiveKit server from `.env` (the local docker one on
 `:7880` by default) and waits. When a student
-opens a lecture it joins the room, plays the pre-recorded voice, and handles
-raise-hand questions. **The first join after a start takes ~25s** (it loads
+opens a lecture it joins the room, loads the script from PostgreSQL, synthesizes
+the voice, and handles raise-hand questions. **The first join after a start takes ~25s** (it loads
 Whisper) — the room honestly shows "preparing" until then.
 
-### 6. Slides (only after the course changed)
+### 6. Slides
 
 ```bash
 node scripts/build-slides.mjs      # or: make slides
 ```
 
-Builds the Slidev decks into `UnivAI-app/public/slides/`. Course generation runs
-this itself — you only need it if you hand-edited `lectures/week-N/slides.md`.
+Integrated slide content is stored as JSONB. Course generation automatically
+compiles its disposable Slidev render cache; this legacy target is not needed.
 
 ## The one-command way
 
@@ -127,7 +127,7 @@ make status      # containers, app, exams, RAG, and the virtual clock
 | Place | What |
 |---|---|
 | `logs/` | **every** log: `lecture-gen.log` while a course builds, `worker-out.log` for the lecturer, … |
-| `lectures/week-N/` | the generated course: `slides.md`, `script.json`, `quiz.json`, `audio/` |
+| PostgreSQL `lecture_artifacts` / `section_packs` | generated plans, scripts, slides, quizzes, and sections |
 | `uploads/` | the book PDF you uploaded |
 
 ## Notes nobody tells you

@@ -1,0 +1,15 @@
+.git
+**/.git
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/.next
+**/coverage
+**/*.log
+.cache
+lectures
+logs
+uploads
+UnivAI-live/models
+UnivAI-live/.audio-cache

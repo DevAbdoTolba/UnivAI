@@ -35,8 +35,8 @@ One dial: **XS / S / M / L / XL** — controls slides per lecture, narration
 length, and how many questions each quiz and the midterm carry
 (M = a normal lecture; XS is the 3-slide smoke-test size).
 
-**Regenerate course** — one button on purpose: lectures, slides, quizzes and
-the pre-recorded voice rebuild together, so quizzes always match what the
+**Regenerate course** — one button on purpose: lectures, slides, quizzes, and
+sections rebuild together in PostgreSQL, so activities always match what the
 lecturer actually says. Progress streams live on the page (and to
 `logs/lecture-gen.log`). Expect ~25 min at size M on the local 3B model.
 

@@ -7,8 +7,8 @@ Six processes, three containers, one virtual clock.
 | Piece | Where | Port | Job |
 |---|---|---|---|
 | **UnivAI-app** (Next.js 16) | `UnivAI-app/` | **3100** | every page + API route; owns Postgres |
-| **voice worker** (Mouth + ears) | `UnivAI-live/` | — | the Lecturer: joins LiveKit rooms, plays the pre-recorded voice, answers raised hands |
-| **course generator** (Brain) | `UnivAI-Agent/generation/` | — | book PDF → 4 weeks of slides + narration + quizzes (spawned by the app, watch `logs/lecture-gen.log`) |
+| **voice worker** (Mouth + ears) | `UnivAI-live/` | — | the Lecturer: joins LiveKit rooms, synthesizes database-backed narration, answers raised hands, and runs sections |
+| **course generator** (Brain) | `UnivAI-Agent/generation/` | — | book PDF → database-backed plans, slides, narration, quizzes, and section packs (spawned by the app, watch `logs/lecture-gen.log`) |
 | **RAG server** (Brain) | `UnivAI-Agent/` | 8000 | indexes the book, answers retrieval queries over MCP |
 | **exam system** (Judge) | `UnivAI-exam_system/` | 3200 | runs quizzes + midterm with proctoring, webhooks results back |
 | Postgres | container `univai-db` | 5433 | books, lectures, attendance, grades, qa_log, **clock_state** |
@@ -22,15 +22,15 @@ Six processes, three containers, one virtual clock.
  /upload (PDF)
     │  1. clear old course (RAG index, Postgres, exam world)
     │  2. RAG ingests the book          → Qdrant
-    │  3. lecture_gen.py writes         → lectures/week-N/{slides.md, script.json, quiz.json}
-    │  4. prerender_audio.py records    → lectures/week-N/audio/*.npy   (the lecturer's voice)
-    │  5. build-slides.mjs builds decks → UnivAI-app/public/slides/week-N/
+    │  3. lecture_gen.py stores         → Postgres lecture_artifacts + section_packs
+    │  4. Postgres generates UUIDs      → public lecture and section identifiers
+    │  5. voice worker synthesizes      → narration from the stored script on demand
     ▼
  /schedule ── /lecture/[id] ──▶ LiveKit room ◀── voice worker
     │                              │  raise hand → STT → RAG → LLM → spoken answer
     ▼                              ▼
  /exams ──▶ exam system (:3200) — draws questions from Mongo question_banks
-    ▲              │  (synced from quiz.json on every exam start)
+    ▲              │  (synced from PostgreSQL quiz payloads on every exam start)
     │              ▼
     └── webhook: score + proctoring report → grades table → /dashboard, /exams, /admin
 ```
@@ -55,9 +55,11 @@ versioned fields, API boundaries, fixtures, idempotency and error contract.
   `self_study`. The exam system's sampler fills ≥90% of any paper from
   lecture-taught questions; self-study is capped at 10%. Questions cover
   topics the lecturer explained — never verbatim quotes of the narration.
-- **The lecture voice is pre-recorded.** `prerender_audio.py` renders every
-  script sentence to disk (Kokoro voice); lectures never wait on a TTS model.
-  Only live Q&A answers are synthesized on the fly (Piper — ~10x realtime).
+- **Generated learning artifacts live in PostgreSQL.** Plans, lecture scripts,
+  slides, quizzes, and section packs are stored as JSONB and exposed through
+  database-generated UUIDs. Slidev compiles a disposable render cache from the
+  database deck, served only through the authenticated presentation endpoint;
+  the worker synthesizes narration on demand.
 - **LLM failover.** Every LLM call goes through `services/common/llm.py`:
   try `LLM_PRIMARY`, retry once, then `LLM_FALLBACK`. Generation calls get
   600s and JSON repair + retries; live Q&A gets 30s and a hard token cap.

@@ -32,9 +32,9 @@ No `make` on Windows? The same target order works through `./run.ps1`.
 ## How it flows
 
 ```
-book.pdf ──▶ RAG (index it) ──▶ course generator (LLM) ──▶ 4 weeks of
-             slides + narration + quizzes ──▶ pre-recorded lecturer voice
-             ──▶ live LiveKit lecture room ──▶ exam system ──▶ grades +
+book.pdf ──▶ RAG (index it) ──▶ course generator (LLM) ──▶ PostgreSQL stores
+             plans + slides + narration + quizzes + sections ──▶ live LiveKit
+             lecture/section rooms ──▶ exam system ──▶ grades +
              proctoring reports, back on your dashboard
 ```
 
@@ -51,7 +51,7 @@ book.pdf ──▶ RAG (index it) ──▶ course generator (LLM) ──▶ 4 w
 ```
 UnivAI-app/          the Face (submodule): Next.js 16 — all UI + API routes + integration
 services/             shared Python plumbing (clock, db, LLM adapter, RAG client) + rag CLIs
-lectures/week-N/      GENERATED from your book: slides.md, script.json, quiz.json
+lectures/             legacy fixture boundary only; integrated content is in PostgreSQL
 UnivAI-Agent/         the Brain (submodule): RAG service + course generation
 UnivAI-live/          the Mouth + ears (submodule): LiveKit rooms, TTS, STT, the live class
 UnivAI-exam_system/   the Judge (submodule): exams, proctoring, records — port 3200

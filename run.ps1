@@ -194,17 +194,17 @@ function Target-Down   { Target-RagStop; docker @Compose down }
 function Target-Clean  { Target-RagStop; docker @Compose down -v; Warn "containers and volumes removed" }
 function Target-Schema {
     Invoke-Sql "infra/schema.sql"
-    Invoke-Sql "infra/migrations/002_final_mvp.sql"
-    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Invoke-Sql "infra/migrations/003_sprint3_learning_flow.sql"
-    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Invoke-Sql "infra/migrations/004_app_library.sql"
-    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Invoke-Sql "infra/migrations/005_lecture_artifact_keys.sql"
-    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (5, 'lecture_artifact_keys') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Invoke-Sql "infra/migrations/006_resumable_course_generation.sql"
-    Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES (6, 'resumable_course_generation') ON CONFLICT (version) DO NOTHING;" | Out-Null
-    Write-Host "base schema and migrations 002-006 applied" -ForegroundColor Green
+    $migrations = Get-ChildItem -LiteralPath "infra/migrations" -Filter "*.sql" |
+        Where-Object { $_.Name -match '^(\d+)_([^.]+)\.sql$' } |
+        Sort-Object Name
+    foreach ($migration in $migrations) {
+        if ($migration.Name -notmatch '^(\d+)_([^.]+)\.sql$') { continue }
+        $version = [int]$Matches[1]
+        $name = $Matches[2].Replace("'", "''")
+        Invoke-Sql $migration.FullName
+        Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES ($version, '$name') ON CONFLICT (version) DO NOTHING;" | Out-Null
+    }
+    Write-Host "base schema and $($migrations.Count) migrations applied" -ForegroundColor Green
 }
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }
@@ -467,7 +467,7 @@ function Target-RagCacheClean {
 }
 function Target-App    { Push-Location UnivAI-app; npx next dev -p $AppPort; Pop-Location }
 function Target-Worker { & $Py UnivAI-live/worker.py dev }
-function Target-Slides { node scripts/build-slides.mjs }
+function Target-Slides { Write-Host "No slide build is required; slides are rendered from Postgres." -ForegroundColor Green }
 function Target-Exams  { Push-Location UnivAI-exam_system; node --env-file=../.env --import tsx server.ts dev; Pop-Location }
 
 function Assert-DevPrerequisites {

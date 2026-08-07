@@ -11,12 +11,9 @@ mcp>=1.2                             # MCP *client*, to call the team's RAG serv
 pypdf>=5.0                           # read the uploaded textbook PDF, page by page
 
 # --- voice-agent (live lecture) ---
-livekit-agents>=0.12
-livekit-plugins-silero>=0.7          # VAD, for barge-in detection
+livekit-agents==1.6.8
+livekit-plugins-silero==1.6.8        # VAD, for barge-in detection
 faster-whisper>=1.1                  # local STT
 coqui-tts>=0.25                      # local streaming TTS (maintained Coqui fork)
 piper-tts>=1.2                       # local TTS fallback if XTTS is too slow on CPU
-kokoro-onnx>=0.4                     # TTS_ENGINE=kokoro, the default for PRE-RENDERED
-                                     # lectures; lecture_gen runs UnivAI-live/
-                                     # prerender_audio.py on this venv, so without it
-                                     # every course build dies at the voice step
+kokoro-onnx>=0.4                     # TTS_ENGINE=kokoro, the default on-demand voice

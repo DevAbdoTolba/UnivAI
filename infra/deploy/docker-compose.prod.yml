@@ -81,17 +81,30 @@ services:
     <<: *service-policy
     image: ${UNIVAI_LIVE_IMAGE:-ghcr.io/devabdotolba/univai-live:mvp2}
     environment:
+      UNIVAI_MODE: integrated
+      UNIVAI_ENV: production
+      DATABASE_URL: postgresql://univai:${POSTGRES_PASSWORD}@postgres:5432/univai
       LIVEKIT_URL: ws://livekit:7880
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
       RAG_MCP_URL: http://agent:8000/mcp
+      STT_MODEL_SIZE: ${STT_MODEL_SIZE:-base}
+      TTS_ENGINE: ${TTS_ENGINE:-piper}
+      TTS_LIVE_ENGINE: ${TTS_LIVE_ENGINE:-piper}
+      PIPER_MODEL: ${PIPER_MODEL:-/models/piper/en_US-lessac-medium.onnx}
+      LIVE_AUDIO_CACHE_DIR: /var/cache/univai-live/audio
       REQUEST_ID_HEADER: X-Request-ID
       LOG_PRIVATE_AUDIO: "false"
       RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
       RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - live-audio-cache:/var/cache/univai-live/audio
+      - ${UNIVAI_LIVE_MODELS_DIR:-../../UnivAI-live/models}:/models:ro
     depends_on:
       livekit:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
       agent:
         condition: service_started
@@ -215,3 +228,4 @@ volumes:
   postgres-data:
   qdrant-data:
   mongo-data:
+  live-audio-cache:

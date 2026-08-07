@@ -471,8 +471,8 @@ worker: ## Run the live-lecture voice agent (TTS + STT). Needs LIVEKIT_* keys
 exams: ## Run the exam system (UnivAI-exam_system) - :3200
 	cd UnivAI-exam_system && node --env-file=../.env --import tsx server.ts dev
 
-slides: ## Build the Slidev decks to UnivAI-app/public/slides/
-	node scripts/build-slides.mjs
+slides: ## Slidev renders are compiled automatically from database artifacts
+	@echo "No manual build is required; generation compiles authenticated Slidev caches from lecture_artifacts.slides_payload."
 
 rag-models: ## Download/preload RAG embedding models
 	cd UnivAI-Agent && uv run python -c "from vector_store.qdrant_client import get_dense_embedder, get_sparse_embedder; print('loading dense embedder'); get_dense_embedder(); print('loading sparse embedder'); get_sparse_embedder(); print('RAG models ready')"

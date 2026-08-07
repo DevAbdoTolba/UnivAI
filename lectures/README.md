@@ -1,38 +1,13 @@
-# lectures/ — the generated course
+# Legacy lecture directory
 
-Everything here is **written by the course builder**
-(`UnivAI-Agent/generation/lecture_gen.py` — the Brain cave) from the uploaded
-book. Don't edit
-by hand unless you know why; the next "Regenerate course" overwrites it.
+Integrated UnivAI no longer generates or reads learner content here.
 
-## Anatomy of a week
+Semester plans live in `books.semester_plan`; lecture scripts, structured
+slides, quizzes, and generation checkpoints live in `lecture_artifacts`; and
+grounded practicals live in `section_packs`. PostgreSQL generates opaque UUIDs
+for every public lecture and section identifier. The app renders slides from
+JSONB, the exam bridge reads quiz JSONB, and the Live worker reads narration
+JSONB and synthesizes speech on demand.
 
-```
-week-N/
-  slides.md      the Slidev deck (title slide + content slides)
-  script.json    what the Lecturer SPEAKS, aligned slide-by-slide, with page citations
-  quiz.json      the week's question bank — each question tagged
-                 "lecture" (taught) or "self_study" (book-only, max 10% of a paper)
-  audio/         the pre-recorded voice: s{segment}-t{sentence}.npy + meta.json
-                 (regenerable in minutes)
-```
-
-`_prompts/` — the personalized raise-hand lines ("Yes, <student>? …"), same
-voice as the lecture.
-
-## Who reads what
-
-- the **UnivAI-app** submodule reads `script.json` (titles, schedule) and serves the built decks
-- the **voice worker** plays `audio/` and follows `script.json`
-- the **exam system** gets `quiz.json` synced into its Mongo question bank on
-  every exam start
-
-## Not in git
-
-Nothing under here is tracked except this README. Everything else is a
-learner's own generated course — it rebuilds from their uploaded book, differs
-per student, and is rewritten on every regenerate, so committing it only
-produced churn and one learner's course in everyone's clone.
-
-A fresh clone therefore starts with an empty `lectures/`; the builder creates
-what it needs on the first run.
+This directory remains only as a clear boundary for old local artifacts and
+standalone fixtures. Nothing in the integrated generation path writes here.
