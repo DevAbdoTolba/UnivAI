@@ -85,6 +85,17 @@ ALTER TABLE books ADD COLUMN IF NOT EXISTS generation_stage TEXT;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS generation_total_weeks INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS generation_ready_weeks INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE books ADD COLUMN IF NOT EXISTS generation_audio_ready_weeks INTEGER NOT NULL DEFAULT 0;
+-- Liveness beat of a running build; a stale one means the build was abandoned
+-- and a new upload may take it over. See migrations/007_generation_heartbeat.sql.
+ALTER TABLE books ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS books_generating_heartbeat_idx
+  ON books (heartbeat_at)
+  WHERE status = 'generating';
+-- Byte identity, so a book already turned into a course is recognised rather
+-- than rebuilt. See migrations/008_document_content_hash.sql.
+CREATE INDEX IF NOT EXISTS books_source_sha256_idx
+  ON books (source_sha256)
+  WHERE source_sha256 IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS course_generation_milestones (
   id            BIGSERIAL PRIMARY KEY,
