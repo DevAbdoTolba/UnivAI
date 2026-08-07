@@ -294,19 +294,23 @@ up: ## Start Postgres + Qdrant + Mongo, then apply the schema
 down: rag-stop ## Stop Postgres + Qdrant + the RAG server (data is kept)
 	$(COMPOSE) down
 
-schema: ## Apply infra/schema.sql (idempotent)
+# Applies every infra/migrations/NNN_name.sql in numeric order and records it in
+# the core_schema_migrations ledger. The list used to be spelled out here, one
+# hand-written pair of lines per migration, so adding a migration meant
+# remembering to wire it up — and a migration that was never wired up still
+# looked applied. Reading the directory removes that step entirely.
+schema: ## Apply infra/schema.sql + every infra/migrations/*.sql (idempotent)
 	@$(DB) < infra/schema.sql > /dev/null
-	@$(DB) < infra/migrations/002_final_mvp.sql > /dev/null
-	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (2, 'final_mvp') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@$(DB) < infra/migrations/003_sprint3_learning_flow.sql > /dev/null
-	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (3, 'sprint3_learning_flow') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@$(DB) < infra/migrations/004_app_library.sql > /dev/null
-	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (4, 'app_library') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@$(DB) < infra/migrations/005_lecture_artifact_keys.sql > /dev/null
-	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (5, 'lecture_artifact_keys') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@$(DB) < infra/migrations/006_resumable_course_generation.sql > /dev/null
-	@$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES (6, 'resumable_course_generation') ON CONFLICT (version) DO NOTHING" > /dev/null
-	@echo "base schema and migrations 002-006 applied"
+	@count=0; \
+	for file in $$(ls infra/migrations/[0-9]*_*.sql | sort); do \
+		base=$$(basename "$$file" .sql); \
+		version=$$(echo "$$base" | cut -d_ -f1 | sed 's/^0*//'); \
+		name=$$(echo "$$base" | cut -d_ -f2-); \
+		$(DB) < "$$file" > /dev/null || exit 1; \
+		$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES ($$version, '$$name') ON CONFLICT (version) DO NOTHING" > /dev/null || exit 1; \
+		count=$$((count + 1)); \
+	done; \
+	echo "base schema and $$count migrations applied"
 
 migrate: schema ## Apply database migrations/schema
 

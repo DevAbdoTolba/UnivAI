@@ -8,7 +8,7 @@
  * Slidev is invoked via npx so it stays out of the app's dependency tree.
  */
 import { execSync } from "child_process";
-import { existsSync, mkdirSync, readdirSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -52,6 +52,13 @@ for (const week of weeks) {
     stdio: "inherit",
     cwd: ROOT,
   });
+  // Slidev keeps its working files in node_modules/.slidev BESIDE the deck, so
+  // every built week leaves ~90KB of build cache sitting inside the learner's
+  // course folder next to slides.md and script.json. The deck is already built
+  // by this point and the cache only feeds the build, so it is deleted rather
+  // than left to accumulate one copy per week. A rebuild recreates it.
+  const cache = path.join(LECTURES, week, "node_modules");
+  if (existsSync(cache)) rmSync(cache, { recursive: true, force: true });
 }
 
 console.log(`\nDone. The lecture page serves these from ${BASE_PREFIX}/week-N/.`);
