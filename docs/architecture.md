@@ -22,9 +22,10 @@ Six processes, three containers, one virtual clock.
  /upload (PDF)
     │  1. clear old course (RAG index, Postgres, exam world)
     │  2. RAG ingests the book          → Qdrant
-    │  3. lecture_gen.py stores         → Postgres lecture_artifacts + section_packs
-    │  4. Postgres generates UUIDs      → public lecture and section identifiers
-    │  5. voice worker synthesizes      → narration from the stored script on demand
+    │  3. same book already taught?     → adopt that course, or write a new one
+    │  4. lecture_gen.py stores         → Postgres lecture_artifacts + section_packs
+    │  5. Postgres generates UUIDs      → public lecture and section identifiers
+    │  6. voice worker synthesizes      → narration from the stored script on demand
     ▼
  /schedule ── /lecture/[id] ──▶ LiveKit room ◀── voice worker
     │                              │  raise hand → STT → RAG → LLM → spoken answer
@@ -60,6 +61,15 @@ versioned fields, API boundaries, fixtures, idempotency and error contract.
   database-generated UUIDs. Slidev compiles a disposable render cache from the
   database deck, served only through the authenticated presentation endpoint;
   the worker synthesizes narration on demand.
+- **A book is taught once.** A course is a function of the bytes it was built
+  from and the pipeline that built it, so when a second learner uploads a book
+  another learner already finished — same `source_sha256`, same course
+  fingerprint, same semester plan, and an unedited curriculum — the lectures,
+  quizzes, decks and section packs are copied instead of regenerated. Rendered
+  narration is keyed by the narration itself, so the copy is already voiced.
+  Attendance, exam attempts and scores are never copied: the teaching is
+  shared, the learner's record is their own. Edit the curriculum and the
+  fingerprint check sends that learner back to a real build.
 - **LLM failover.** Every LLM call goes through `services/common/llm.py`:
   try `LLM_PRIMARY`, retry once, then `LLM_FALLBACK`. Generation calls get
   600s and JSON repair + retries; live Q&A gets 30s and a hard token cap.
