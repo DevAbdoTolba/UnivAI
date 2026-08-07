@@ -32,6 +32,8 @@ logs/
 
 # caches (voice models live in UnivAI-live/models/, ignored by that repo)
 .cache/
+# rendered narration, rebuilt on demand from lecture_artifacts.script_payload
+.audio-cache/
 
 # os
 Thumbs.db
