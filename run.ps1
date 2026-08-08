@@ -504,6 +504,11 @@ function Assert-DevPrerequisites {
     if ($LASTEXITCODE -ne 0 -or -not ($published -match ":$MongoPort$")) {
         $notReady += "univai-mongo(host-port-not-published)"
     }
+    $mongoUri = Read-DotEnvValue "MONGODB_URI"
+    $localMongoPattern = "^mongodb(?:\+srv)?://(?:[^@/]+@)?(?:localhost|127\.0\.0\.1|\[::1\]):$MongoPort(?:/|\?|$)"
+    if (-not $mongoUri -or $mongoUri -notmatch $localMongoPattern) {
+        $notReady += "MONGODB_URI(expected-local-port-$MongoPort)"
+    }
     if ($notReady.Count -gt 0) {
         throw "Development infrastructure is not ready: $($notReady -join ', '). Run: ./run.ps1 up"
     }

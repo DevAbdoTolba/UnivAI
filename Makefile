@@ -517,6 +517,11 @@ dev-check:
 	if ! docker port univai-mongo 27017/tcp 2>/dev/null | grep -Eq ':$(MONGO_PORT)$$'; then \
 		missing="$$missing univai-mongo(host-port-not-published)"; \
 	fi; \
+	mongo_uri="$$(sed -n 's/^[[:space:]]*MONGODB_URI[[:space:]]*=[[:space:]]*//p' .env | tail -n 1 | sed 's/[[:space:]]*#.*$$//')"; \
+	case "$$mongo_uri" in \
+		mongodb://localhost:$(MONGO_PORT)/*|mongodb://127.0.0.1:$(MONGO_PORT)/*|mongodb://\[::1\]:$(MONGO_PORT)/*) ;; \
+		*) missing="$$missing MONGODB_URI(expected-local-port-$(MONGO_PORT))" ;; \
+	esac; \
 	if [ -n "$$missing" ]; then \
 		echo "ERROR: development infrastructure is not ready:$$missing"; \
 		echo "Run: make up"; \
