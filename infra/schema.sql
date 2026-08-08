@@ -150,7 +150,8 @@ CREATE TABLE IF NOT EXISTS "user" (
   "banned"        boolean,
   "banReason"     text,
   "banExpires"    timestamptz,
-  "phone"         text NOT NULL,
+  -- NULL = not given. Google sign-in supplies no phone number (migration 011).
+  "phone"         text,
   "studentId"     text
 );
 -- studentId is server-assigned and must be globally unique (nulls allowed only
