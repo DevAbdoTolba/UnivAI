@@ -219,13 +219,13 @@ function Target-SeedAuth {
 UPDATE "user"
 SET
   "role" = 'super_admin',
-  "studentId" = COALESCE(
-    "studentId",
+  "registrationNumber" = COALESCE(
+    "registrationNumber",
     'S-' || EXTRACT(YEAR FROM CURRENT_DATE)::int || '-' || LPAD(nextval('student_id_seq')::text, 6, '0')
   ),
   "updatedAt" = CURRENT_TIMESTAMP
 WHERE lower("email") = lower(:'admin_email')
-RETURNING "email", "role", "studentId";
+RETURNING "email", "role", "registrationNumber";
 '@
     $result = Invoke-SqlText $sql @("-v", "admin_email=$email")
     if ($result -match "(0 rows)") {

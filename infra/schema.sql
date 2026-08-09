@@ -2,6 +2,8 @@
 -- NOTE: RAG owns its own storage (chunks, embeddings, vector index) in the
 -- team's existing RAG service. This app never stores or indexes book text.
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- The virtual clock. Exactly one row (id = 1). Nothing else in the system
 -- may read the wall clock; see ClockService (app/lib/clock.ts, services/common/clock.py).
 CREATE TABLE IF NOT EXISTS clock_state (
@@ -134,12 +136,29 @@ CREATE TABLE IF NOT EXISTS settings (
 -- and expects. Column order/types must match the generator exactly.
 -- ===========================================================================
 
--- Serial behind the human-readable studentId (S-YYYY-NNNNNN), assigned in the
+-- Serial behind the human-readable registrationNumber (S-YYYY-NNNNNN), assigned in the
 -- user.create hook in lib/auth.ts. The RAG / LiveKit namespace key.
 CREATE SEQUENCE IF NOT EXISTS student_id_seq START 1;
 
+-- Upgrade the old displayed identifier name before the idempotent definitions
+-- below run. Migration 014 performs the UUID re-key and preserves relations.
+DO $$
+BEGIN
+  IF to_regclass('public."user"') IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'studentId'
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'registrationNumber'
+     ) THEN
+    ALTER TABLE "user" RENAME COLUMN "studentId" TO "registrationNumber";
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS "user" (
-  "id"            text NOT NULL PRIMARY KEY,
+  "id"            uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name"          text NOT NULL,
   "email"         text NOT NULL UNIQUE,
   "emailVerified" boolean NOT NULL,
@@ -152,30 +171,30 @@ CREATE TABLE IF NOT EXISTS "user" (
   "banExpires"    timestamptz,
   -- NULL = not given. Google sign-in supplies no phone number (migration 011).
   "phone"         text,
-  "studentId"     text
+  "registrationNumber"     text
 );
--- studentId is server-assigned and must be globally unique (nulls allowed only
+-- registrationNumber is server-assigned and must be globally unique (nulls allowed only
 -- transiently). Unique INDEX (not a table constraint) keeps this idempotent.
-CREATE UNIQUE INDEX IF NOT EXISTS "user_studentId_key" ON "user" ("studentId");
+CREATE UNIQUE INDEX IF NOT EXISTS "user_registrationNumber_key" ON "user" ("registrationNumber");
 
 CREATE TABLE IF NOT EXISTS "session" (
-  "id"             text NOT NULL PRIMARY KEY,
+  "id"             uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "expiresAt"      timestamptz NOT NULL,
   "token"          text NOT NULL UNIQUE,
   "createdAt"      timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt"      timestamptz NOT NULL,
   "ipAddress"      text,
   "userAgent"      text,
-  "userId"         text NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
+  "userId"         uuid NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
   "impersonatedBy" text
 );
 CREATE INDEX IF NOT EXISTS "session_userId_idx" ON "session" ("userId");
 
 CREATE TABLE IF NOT EXISTS "account" (
-  "id"                    text NOT NULL PRIMARY KEY,
+  "id"                    uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "accountId"             text NOT NULL,
   "providerId"            text NOT NULL,
-  "userId"                text NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
+  "userId"                uuid NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
   "accessToken"           text,
   "refreshToken"          text,
   "idToken"               text,
@@ -189,7 +208,7 @@ CREATE TABLE IF NOT EXISTS "account" (
 CREATE INDEX IF NOT EXISTS "account_userId_idx" ON "account" ("userId");
 
 CREATE TABLE IF NOT EXISTS "verification" (
-  "id"         text NOT NULL PRIMARY KEY,
+  "id"         uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "identifier" text NOT NULL,
   "value"      text NOT NULL,
   "expiresAt"  timestamptz NOT NULL,
@@ -217,7 +236,7 @@ CREATE INDEX IF NOT EXISTS auth_audit_created_idx ON auth_audit (created_at DESC
 -- ===========================================================================
 -- Phase 5 — per-student multi-tenancy.  See docs/auth-plan.md §5.
 --
--- Tenant key is the human-readable user.studentId (S-YYYY-NNNNNN), threaded
+-- Tenant key is the human-readable user.registrationNumber (S-YYYY-NNNNNN), threaded
 -- across every service (RAG namespace, LiveKit identity, lecture/slide disk
 -- dirs, exam records). Each learner owns their own book, course, attendance,
 -- grades and Q&A; every app query filters by student_id.
@@ -243,7 +262,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS attendance_student_lecture_key ON attendance (
 CREATE INDEX IF NOT EXISTS books_student_idx    ON books    (student_id);
 CREATE INDEX IF NOT EXISTS grades_student_idx   ON grades   (student_id);
 CREATE INDEX IF NOT EXISTS qa_log_student_idx   ON qa_log   (student_id);
--- (Referential FKs to "user"("studentId") with ON DELETE CASCADE are a later
+-- (Referential FKs to "user"("registrationNumber") with ON DELETE CASCADE are a later
 -- hardening step; ownership is enforced in the app layer today.)
 
 -- ===========================================================================

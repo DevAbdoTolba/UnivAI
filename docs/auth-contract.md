@@ -19,7 +19,7 @@
 
 | | Dev A (you + Claude) | Dev B |
 |---|---|---|
-| Owns | `lib/auth.ts` (server config), `lib/auth-client.ts` (shared client), `lib/session.ts` (server helpers), `middleware.ts`, DB schema, roles/admin plugin, email sending, `studentId` generation, securing existing API routes, RAG/LiveKit identity threading | Every page in §5, all MUI forms, client validation, error rendering, redirects, `NavBar` auth state |
+| Owns | `lib/auth.ts` (server config), `lib/auth-client.ts` (shared client), `lib/session.ts` (server helpers), `middleware.ts`, DB schema, roles/admin plugin, email sending, `registrationNumber` generation, securing existing API routes, RAG/LiveKit identity threading | Every page in §5, all MUI forms, client validation, error rendering, redirects, `NavBar` auth state |
 | Never touches | Dev B's pages | `lib/auth.ts`, `lib/session.ts`, `middleware.ts`, any auth internals |
 
 **The single seam:** Dev B imports **only** from `lib/auth-client.ts`. That file is
@@ -49,7 +49,7 @@ Session lives in an **HTTP-only cookie** (Dev A configures `Secure`/`SameSite=La
 Dev B never reads or writes cookies. In **client components** B reads the session with
 `useSession()`. In **server components / server actions** B calls the server helper
 from §4. Email verification is **required**: a freshly registered user is *unverified*
-and must click the emailed link before they can sign in. `role` and `studentId` are
+and must click the emailed link before they can sign in. `role` and `registrationNumber` are
 **server-assigned** — B displays them but never sends them.
 
 ---
@@ -61,13 +61,13 @@ and must click the emailed link before they can sign in. `role` and `studentId` 
 export type Role = "student" | "admin" | "super_admin";
 
 export type SessionUser = {
-  id: string;              // Better Auth user id (opaque)
+  id: string;              // Better Auth user UUID (opaque)
   name: string;
   email: string;
   emailVerified: boolean;
   phone: string | null;    // E.164, e.g. "+201234567890" — stored, NOT verified
   role: Role;              // server-assigned; default "student"
-  studentId: string;       // server-generated, e.g. "S-2026-000042" (RAG/LiveKit key)
+  registrationNumber: string;       // server-generated, e.g. "S-2026-000042" (RAG/LiveKit key)
   image: string | null;
   createdAt: string;       // ISO 8601
 };
@@ -154,7 +154,7 @@ authClient.signUp.email({
   phone: string,           // E.164; additional field, input allowed
 });
 ```
-- **B sends only these four.** `role` and `studentId` are server-set — sending them is ignored/rejected.
+- **B sends only these four.** `role` and `registrationNumber` are server-set — sending them is ignored/rejected.
 - **Success:** account created, verification email sent automatically. Session is **not** usable until verified. → route to `/verify-email?email=<email>`.
 - **Errors:** `USER_ALREADY_EXISTS`, `INVALID_EMAIL`, `PASSWORD_TOO_SHORT` (see §8).
 
@@ -196,7 +196,7 @@ authClient.sendVerificationEmail({ email, callbackURL: "/login?verified=1" });  
 ```ts
 authClient.updateUser({ name?: string, phone?: string });
 ```
-- **Success:** session's user refreshes; show a saved toast. `email`, `role`, `studentId` are **not** editable here.
+- **Success:** session's user refreshes; show a saved toast. `email`, `role`, `registrationNumber` are **not** editable here.
 
 ### 6.8 Profile — change email (re-verify)
 ```ts
@@ -287,7 +287,7 @@ Field-level vs form-level placement above is part of the contract so error UX is
 | `admin` / `super_admin` | student items · **Admin** link · avatar menu (Profile, Logout) |
 | `super_admin` | admin items · Admin ▸ Users |
 
-The avatar menu shows `name` and `studentId`. B reads all of this from `useSession()`.
+The avatar menu shows `name` and `registrationNumber`. B reads all of this from `useSession()`.
 
 ---
 
@@ -301,7 +301,7 @@ resolves to a fake that returns the §3 shapes:
 const fakeUser: SessionUser = {
   id: "u_mock", name: "Test Student", email: "test@univai.dev",
   emailVerified: true, phone: "+201234567890", role: "student",
-  studentId: "S-2026-000001", image: null, createdAt: new Date().toISOString(),
+  registrationNumber: "S-2026-000001", image: null, createdAt: new Date().toISOString(),
 };
 // each action returns { data, error } after a small delay; toggle error/verify
 // states with query params or a dev-only switch so B can build every branch.
@@ -323,7 +323,7 @@ const fakeUser: SessionUser = {
 
 **Ready-to-integrate checklist (end of week 1):**
 - [ ] `lib/auth-client.ts` exports the real client (Dev A) — mock flag removed
-- [ ] `SessionUser` matches §3 exactly, including `phone`/`role`/`studentId`
+- [ ] `SessionUser` matches §3 exactly, including `phone`/`role`/`registrationNumber`
 - [ ] register → verification email delivered → login works end-to-end
 - [ ] forgot → reset email delivered → reset works end-to-end
 - [ ] `/admin/users` `setRole` / `banUser` reflect in the DB and re-render the row

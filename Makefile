@@ -342,7 +342,7 @@ seed-auth: ## Promote SUPER_ADMIN_EMAIL to super_admin if that user exists
 		echo "SUPER_ADMIN_EMAIL is empty in .env; skipping auth seed."; \
 	else \
 		echo "==> promoting $$email if it exists"; \
-		printf '%s\n' 'UPDATE "user" SET "role" = '\''super_admin'\'', "studentId" = COALESCE("studentId", '\''S-'\'' || EXTRACT(YEAR FROM CURRENT_DATE)::int || '\''-'\'' || LPAD(nextval('\''student_id_seq'\'')::text, 6, '\''0'\'')), "updatedAt" = CURRENT_TIMESTAMP WHERE lower("email") = lower(:'\''admin_email'\'') RETURNING "email", "role", "studentId";' | $(DB) -v admin_email="$$email"; \
+		printf '%s\n' 'UPDATE "user" SET "role" = '\''super_admin'\'', "registrationNumber" = COALESCE("registrationNumber", '\''S-'\'' || EXTRACT(YEAR FROM CURRENT_DATE)::int || '\''-'\'' || LPAD(nextval('\''student_id_seq'\'')::text, 6, '\''0'\'')), "updatedAt" = CURRENT_TIMESTAMP WHERE lower("email") = lower(:'\''admin_email'\'') RETURNING "email", "role", "registrationNumber";' | $(DB) -v admin_email="$$email"; \
 	fi
 
 reset: ## Wipe lectures, attendance, grades, Q&A and reset the virtual clock

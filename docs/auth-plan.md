@@ -50,8 +50,8 @@ Next.js App Router
    └─ every other api route  ── getSession() → scope all SQL by user.id
         │
         ├─ Postgres (pg pool)   users/session/account/verification  +  owner_id on all data tables
-        ├─ RAG (MCP)            user_id = session studentId   (per-student namespace)
-        ├─ LiveKit              token identity = studentId
+        ├─ RAG (MCP)            user_id = session registrationNumber   (per-student namespace)
+        ├─ LiveKit              token identity = registrationNumber
         └─ Exam system (:3200)  webhook payloads carry userId
 ```
 
@@ -70,12 +70,13 @@ not an authorization boundary).
 
 | Field | Type | Notes |
 |-------|------|-------|
+| `id` | uuid | hidden primary key used by authentication relations |
 | `name` | text | built-in |
 | `email` | text unique | built-in, verification required |
 | `emailVerified` | bool | built-in |
 | `phone` | text | additional field, **stored only** (D4). Store with country code. |
 | `role` | enum `student\|admin\|super_admin` | default `student`; **server-set only**, never from client |
-| `studentId` | text unique | generated at signup (e.g. `S-2026-000042`); the RAG namespace key |
+| `registrationNumber` | text unique | generated at signup (e.g. `S-2026-000042`); the RAG namespace key |
 | `banned` / `banReason` / `banExpires` | — | from admin plugin |
 | `createdAt`/`updatedAt` | ts | built-in |
 
@@ -83,7 +84,7 @@ not an authorization boundary).
 Add to `infra/schema.sql` (kept idempotent, matching the file's existing style):
 
 ```sql
--- Every learner-owned row points at its owner (Better Auth user.id is text).
+-- Learner-owned rows use the displayed registration number as their tenant key.
 ALTER TABLE books       ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE lectures    ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE attendance  ADD COLUMN IF NOT EXISTS user_id TEXT;
@@ -119,7 +120,7 @@ You asked for **name, email, phone, password**. Add these — they're load-beari
 
 | Field | Source | Why |
 |-------|--------|-----|
-| `studentId` | **server-generated** | RAG namespacing + LiveKit identity. Never user-supplied. |
+| `registrationNumber` | **server-generated** | RAG namespacing + LiveKit identity. Never user-supplied. |
 | `role` | **server-set** (`student`) | Privilege escalation risk if ever client-controlled. |
 | `emailVerified` | flow | Gate access until verified (or allow limited access pre-verify). |
 | password confirmation | client-only | UX; not stored. |
@@ -159,10 +160,10 @@ Three roles via Better Auth's **admin plugin**:
 Today the student ID is the constant `RAG_USER_ID`. Multi-tenant requires the
 **authenticated student's ID to travel to every downstream service**:
 
-1. **Ingestion (`/upload`)** — tag the uploaded book + its chunks with `studentId` so retrieval is namespaced per owner. Spawned generation must receive `--user-id`.
-2. **Course generation (Brain)** — the app spawns generation per user; pass the owner's `studentId` through so lectures/quizzes land against the right owner.
-3. **Live lecture (Mouth)** — LiveKit token `identity` becomes the real `studentId`; the voice worker and its RAG Q&A use that identity instead of the env constant.
-4. **Live Q&A retrieval** — `rag_client.retrieve_context(..., user_id=studentId)` per request, not from env.
+1. **Ingestion (`/upload`)** — tag the uploaded book + its chunks with `registrationNumber` so retrieval is namespaced per owner. Spawned generation must receive `--user-id`.
+2. **Course generation (Brain)** — the app spawns generation per user; pass the owner's `registrationNumber` through so lectures/quizzes land against the right owner.
+3. **Live lecture (Mouth)** — LiveKit token `identity` becomes the real `registrationNumber`; the voice worker and its RAG Q&A use that identity instead of the env constant.
+4. **Live Q&A retrieval** — `rag_client.retrieve_context(..., user_id=registrationNumber)` per request, not from env.
 5. **Exam system (`:3200`)** — webhook payloads and question-bank sync must carry `userId` so results route to the right owner's `grades`.
 
 > **Risk:** the Python services currently read `RAG_USER_ID` from env at import time.
@@ -186,7 +187,7 @@ Better Auth covers most of this; verify each is actually on:
 - [ ] CSRF: covered for Better Auth endpoints; audit any custom mutating routes.
 - [ ] Account lockout / brute-force protection on repeated failures.
 - [ ] Input validation with **zod** on every auth endpoint (server-side).
-- [ ] `role` and `studentId` never accepted from the client on register/update.
+- [ ] `role` and `registrationNumber` never accepted from the client on register/update.
 - [ ] Audit log for admin actions (role change, ban).
 - [ ] Secrets (`BETTER_AUTH_SECRET`, provider keys, `SUPER_ADMIN_EMAIL`) in root `.env`, never committed.
 - [ ] Run `/security-review` on the branch before merge.
@@ -222,7 +223,7 @@ Provider accounts (Resend/SES), `SUPER_ADMIN_EMAIL`, `BETTER_AUTH_SECRET`, DB re
 
 ### Phase 1 — Auth foundation (backend)
 Better Auth config on the existing `pg` pool; generate `user/session/account/verification`;
-additional fields (`phone`, `role`, `studentId`); `api/auth/[...all]` handler; `middleware.ts`;
+additional fields (`phone`, `role`, `registrationNumber`); `api/auth/[...all]` handler; `middleware.ts`;
 `lib/session.ts` (`requireUser`/`requireAdmin`).
 **Done when:** a user can be created via API, gets a session cookie, and a protected test route 401s without it.
 
@@ -246,7 +247,7 @@ View/edit name + phone; change email (re-verify); change password; "log out all 
 
 ### Phase 5 — Multi-tenant scoping (**serialize under one owner**)
 Ownership columns + composite uniqueness migration; scope every `app/api/**` query by `user_id`;
-thread `studentId` into RAG / LiveKit / generation / exam webhooks; resolve §9 decisions.
+thread `registrationNumber` into RAG / LiveKit / generation / exam webhooks; resolve §9 decisions.
 **Done when:** two users each upload a book and each sees only their own courses, lectures, grades, and RAG answers; no query returns another user's rows.
 
 ### Phase 6 — Hardening & sign-off
@@ -274,7 +275,7 @@ Instead:
 
 **Coordination contract (write it day 1 — this is what makes the split safe):**
 a short `docs/auth-contract.md` fixing the **API surface** (endpoint paths, request/response
-shapes) and the **session/user shape** (`{ id, name, email, phone, role, studentId, emailVerified }`).
+shapes) and the **session/user shape** (`{ id, name, email, phone, role, registrationNumber, emailVerified }`).
 Dev B builds against that contract with stubbed responses while Dev A implements it.
 
 **Sequencing:** Phases 1–4 parallelize cleanly (A backend, B UI). **Phase 5 is a
@@ -303,7 +304,7 @@ task board generated the same way — don't introduce a new workflow tool just f
 
 **Dev A**
 1. Install + configure Better Auth on the `pg` pool; generate core tables.
-2. Add `phone`/`role`/`studentId` fields + `studentId` generator.
+2. Add `phone`/`role`/`registrationNumber` fields + `registrationNumber` generator.
 3. `middleware.ts` + `lib/session.ts` (`requireUser`/`requireAdmin`).
 4. Wire Resend/SES for reset + verification callbacks.
 5. Write `docs/auth-contract.md` (with Dev B).
