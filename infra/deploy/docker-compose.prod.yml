@@ -46,7 +46,17 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
       BETTER_AUTH_URL: https://${DOMAIN:-localhost}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-UnivAI <onboarding@resend.dev>}
+      NOTIFICATION_DISPATCH_SECRET: ${NOTIFICATION_DISPATCH_SECRET:-}
       SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      PAYPAL_API_BASE: ${PAYPAL_API_BASE:-https://api-m.paypal.com}
+      PAYPAL_PRODUCT_ID: ${PAYPAL_PRODUCT_ID:-}
+      PAYPAL_SUPPORTER_PLAN_ID: ${PAYPAL_SUPPORTER_PLAN_ID:-}
+      PAYPAL_PATRON_PLAN_ID: ${PAYPAL_PATRON_PLAN_ID:-}
+      PAYPAL_WEBHOOK_URL: ${PAYPAL_WEBHOOK_URL:-}
+      PAYPAL_WEBHOOK_ID: ${PAYPAL_WEBHOOK_ID:-}
       TRACE_HEADER: traceparent
       REQUEST_ID_HEADER: X-Request-ID
       RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
@@ -59,6 +69,28 @@ services:
       agent:
         condition: service_started
       exam:
+        condition: service_started
+
+  notification-dispatcher:
+    <<: *service-policy
+    image: curlimages/curl:8.21.0
+    entrypoint: ["/bin/sh", "-ec"]
+    command: >-
+      DISPATCH_SECRET="$${NOTIFICATION_DISPATCH_SECRET:-$${BETTER_AUTH_SECRET}}";
+      while true; do
+        if [ -n "$${DISPATCH_SECRET}" ]; then
+          curl --fail --silent --show-error --max-time 20 --retry 2
+          -X POST
+          -H "Authorization: Bearer $${DISPATCH_SECRET}"
+          http://app:3100/api/notifications/dispatch || true;
+        fi;
+        sleep 60;
+      done
+    environment:
+      NOTIFICATION_DISPATCH_SECRET: ${NOTIFICATION_DISPATCH_SECRET:-}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+    depends_on:
+      app:
         condition: service_started
 
   agent:
