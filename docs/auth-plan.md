@@ -99,7 +99,7 @@ ALTER TABLE qa_log      ADD COLUMN IF NOT EXISTS user_id TEXT;
 ```
 
 - **`clock_state` is the open question — see §9.1.** It is a global singleton today; multi-tenant probably needs it per-user/per-course.
-- **Settings** (`course_size`, …): decide global vs per-user; likely per-user once each student runs their own semester.
+- **Settings**: decide global vs per-user for every new operational key.
 - Once every data row has an owner, add `NOT NULL` + FKs to `user(id)` and backfill/clear the demo data.
 
 ### 4.3 Row scoping helper

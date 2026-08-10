@@ -398,7 +398,6 @@ export function checkContracts(root = process.cwd()) {
     failures.push("Exam webhook uses guilt terminology");
   }
 
-  const appSizes = readFileSync(path.join(root, "UnivAI-app", "lib", "course-size.ts"), "utf8");
   const agentLectureGen = readFileSync(
     path.join(root, "UnivAI-Agent", "generation", "lecture_gen.py"),
     "utf8"
@@ -407,15 +406,6 @@ export function checkContracts(root = process.cwd()) {
     path.join(root, "UnivAI-app", "lib", "semester-plan.ts"),
     "utf8"
   );
-  const expectedQuizPapers = { XS: 5, S: 6, M: 10, L: 12, XL: 15 };
-  for (const [name, count] of Object.entries(expectedQuizPapers)) {
-    requireMatch(
-      appSizes,
-      new RegExp(`${name}:\\s*\\{\\s*quizPaper:\\s*${count}`),
-      `App assessment size drift: ${name}`,
-      failures
-    );
-  }
   // 45, not 30: once a week split into a theoretical lecture and a section,
   // the Agent raised the floor for the theoretical half (UnivAI-Agent
   // 502e7c3). The Agent owns this constant — the app has no counterpart — so

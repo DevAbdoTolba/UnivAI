@@ -120,7 +120,7 @@ CREATE INDEX IF NOT EXISTS course_generation_milestones_book_idx
 CREATE INDEX IF NOT EXISTS course_generation_milestones_student_status_idx
   ON course_generation_milestones (student_id, status, updated_at);
 
--- Small key/value admin settings (e.g. course_size: XS | S | M | L | XL).
+-- Small key/value operational settings.
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -347,6 +347,32 @@ CREATE INDEX IF NOT EXISTS notification_email_outbox_dispatch_idx
 
 CREATE INDEX IF NOT EXISTS notification_email_outbox_user_idx
   ON notification_email_outbox (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_rate_limit_policies (
+  user_id          uuid NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
+  scope            text NOT NULL
+                     CHECK (scope IN ('upload', 'generation', 'assessment', 'live', 'feedback', 'account')),
+  enabled          boolean NOT NULL DEFAULT true,
+  blocked          boolean NOT NULL DEFAULT false,
+  max_requests     integer NOT NULL CHECK (max_requests BETWEEN 1 AND 10000),
+  window_seconds   integer NOT NULL CHECK (window_seconds BETWEEN 1 AND 86400),
+  updated_by       uuid REFERENCES "user" ("id") ON DELETE SET NULL,
+  updated_at       timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, scope)
+);
+
+CREATE TABLE IF NOT EXISTS user_rate_limit_usage (
+  user_id          uuid NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
+  scope            text NOT NULL
+                     CHECK (scope IN ('upload', 'generation', 'assessment', 'live', 'feedback', 'account')),
+  bucket_start     timestamptz NOT NULL,
+  request_count    integer NOT NULL DEFAULT 0 CHECK (request_count >= 0),
+  updated_at       timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, scope, bucket_start)
+);
+
+CREATE INDEX IF NOT EXISTS user_rate_limit_usage_cleanup_idx
+  ON user_rate_limit_usage (bucket_start);
 
 -- Audit trail for privileged admin actions (role changes, bans, deletes).
 -- Written by the Better Auth after-hook in lib/auth-audit.ts. Uses REAL wall

@@ -1,6 +1,4 @@
 -- Deterministic integration-demo records. Authentication still uses Better Auth.
-INSERT INTO settings(key, value) VALUES ('course_size', 'XS')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
 DELETE FROM attendance WHERE student_id = 'S-2026-000042';
 DELETE FROM lectures WHERE student_id = 'S-2026-000042';
