@@ -1,0 +1,32 @@
+{
+  "schema_version": "univai.evaluation-dataset-manifest.v2",
+  "dataset_version": "univai-llm-eval-v1.0",
+  "corpus_id": "asteria-handbook-v1",
+  "case_count": 72,
+  "manual_case_count": 44,
+  "required_case_count": 67,
+  "exploratory_case_count": 5,
+  "category_counts": {
+    "grounded_factual": 12,
+    "multi_hop": 8,
+    "refusal": 8,
+    "citation_integrity": 8,
+    "direct_jailbreak": 8,
+    "indirect_injection": 6,
+    "multilingual": 10,
+    "conflict_temporal": 4,
+    "malformed_resilience": 4,
+    "privacy_tenant": 4
+  },
+  "manual_type_counts": {
+    "UAT": 12,
+    "Usability": 8,
+    "Manual penetration": 16,
+    "Accessibility": 8
+  },
+  "ground_truth_status": "author proposed; two-person adjudication required",
+  "execution_status": "NOT_RUN",
+  "dataset_sha256": "62c20189c1d656fc3b395eaddfeb6360fdcca4f1ad50586c095e9ae50f047bdb",
+  "corpus_sha256": "631812b4ace1567911b5f2a896ec12162eef8f0fbb7a472d18747faa67cc0abb",
+  "manual_protocols_sha256": "16f0a2e52e8e0c3fcabf108f2a8bd9d09cea232196f3167c5cd4bbd9b54bfa06"
+}

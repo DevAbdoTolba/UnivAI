@@ -1,0 +1,95 @@
+{
+  "schema_version": "univai.evaluation-citation-map.v2",
+  "mapping_status": "template",
+  "dataset_version": "univai-llm-eval-v1.0",
+  "corpus_id": "asteria-handbook-v1",
+  "captured_at": "REPLACE_WITH_ISO_8601_TIMESTAMP_WITH_TIMEZONE",
+  "capture_adapter": "REPLACE_WITH_ADAPTER_NAME_AND_VERSION",
+  "source_document_sha256": "REPLACE_WITH_64_CHAR_LOWERCASE_SHA256",
+  "mappings": [
+    {
+      "fixture_id": "AST-P004",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 4,
+      "section": "Aurora transaction protocol",
+      "excerpt_sha256": "9922da8b08b23d457315dc7e4797caff5b2cda423b9dcffc33776f1b9f5eff78"
+    },
+    {
+      "fixture_id": "AST-P007",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 7,
+      "section": "Frame checksum",
+      "excerpt_sha256": "c571e0065106fea38e7d20dc8ea332c0bcfda6ee1b8ab416f135dc0a856ab29f"
+    },
+    {
+      "fixture_id": "AST-P012",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 12,
+      "section": "Retry policy",
+      "excerpt_sha256": "5f77686332cbcb9c0027fd4173faa15bbda64cea59df4a80a62a13ed397a4966"
+    },
+    {
+      "fixture_id": "AST-P018",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 18,
+      "section": "Retention",
+      "excerpt_sha256": "308cd3ec229f93b0b298ef8812bf7bf94e5334dea1cdf401b556cffe0ca37012"
+    },
+    {
+      "fixture_id": "AST-P022",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 22,
+      "section": "Tenant-safe cache identity",
+      "excerpt_sha256": "bcd7044356688081282b36a9568af7a5527f68cc1c36bba5d7a8679fb39ad642"
+    },
+    {
+      "fixture_id": "AST-P027",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 27,
+      "section": "Attendance bands",
+      "excerpt_sha256": "8dcc7c1936f76e21ee9af9afa8ed83b6f2306d296b85bfead75a322ec8227f60"
+    },
+    {
+      "fixture_id": "AST-P031",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 31,
+      "section": "Arabic glossary",
+      "excerpt_sha256": "629fe0750a1db25d119a877da8b76d8ed89cc3eadfd820f89cb78ceb474e011d"
+    },
+    {
+      "fixture_id": "AST-P035",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 35,
+      "section": "Model lifecycle",
+      "excerpt_sha256": "7f11d83be0bc9fcb8f9a22ba7b901159c42ad8c1fae39bbc011003585b894b5f"
+    },
+    {
+      "fixture_id": "AST-P041",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 41,
+      "section": "Untrusted document example",
+      "excerpt_sha256": "15dcd4b5a517d978f0a2f562f1b8c31ff61050843998d5327a7bdd88a990f925"
+    },
+    {
+      "fixture_id": "AST-P046",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 46,
+      "section": "Solar output",
+      "excerpt_sha256": "a2632acff7b6417238d70cb62d600eacca2340d9c071030ed90b43ccf23b191b"
+    },
+    {
+      "fixture_id": "AST-P052",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 52,
+      "section": "Reference architecture",
+      "excerpt_sha256": "e3af646f21160edf279d3628b4c74ba239c648afa42eed40e744d605e63a457c"
+    },
+    {
+      "fixture_id": "AST-P060",
+      "document_id": "REPLACE_WITH_CAPTURED_DOCUMENT_ID",
+      "page": 60,
+      "section": "Publication record",
+      "excerpt_sha256": "2184d007d13db4068a61a2d5a3995ffc108b8024275888dd8d57be6c42be8b89"
+    }
+  ]
+}

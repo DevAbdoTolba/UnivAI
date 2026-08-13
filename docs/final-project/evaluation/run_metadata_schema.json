@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:univai:evaluation:run-metadata:v2",
+  "title": "UnivAI sealed evaluation run metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capture_protocol_version",
+    "run_id",
+    "environment",
+    "operator_id",
+    "capture_command",
+    "captured_at",
+    "dataset_sha256",
+    "corpus_sha256",
+    "outputs_sha256",
+    "citation_mapping_sha256",
+    "core_git_sha",
+    "app_git_sha",
+    "agent_git_sha",
+    "live_git_sha",
+    "exam_git_sha",
+    "model_configuration"
+  ],
+  "properties": {
+    "schema_version": {"const": "univai.evaluation-run-metadata.v2"},
+    "capture_protocol_version": {"const": "univai.external-capture.v2"},
+    "run_id": {"type": "string", "minLength": 1},
+    "environment": {"type": "string", "minLength": 1},
+    "operator_id": {"type": "string", "minLength": 1},
+    "capture_command": {"type": "string", "minLength": 1},
+    "captured_at": {"type": "string", "format": "date-time"},
+    "dataset_sha256": {"$ref": "#/$defs/sha256"},
+    "corpus_sha256": {"$ref": "#/$defs/sha256"},
+    "outputs_sha256": {"$ref": "#/$defs/sha256"},
+    "citation_mapping_sha256": {"$ref": "#/$defs/sha256"},
+    "core_git_sha": {"$ref": "#/$defs/git_sha"},
+    "app_git_sha": {"$ref": "#/$defs/git_sha"},
+    "agent_git_sha": {"$ref": "#/$defs/git_sha"},
+    "live_git_sha": {"$ref": "#/$defs/git_sha"},
+    "exam_git_sha": {"$ref": "#/$defs/git_sha"},
+    "model_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model_id",
+        "prompt_version",
+        "temperature",
+        "embedding_model",
+        "sparse_model",
+        "reranker_model"
+      ],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "model_id": {"type": "string", "minLength": 1},
+        "prompt_version": {"type": "string", "minLength": 1},
+        "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+        "embedding_model": {"type": "string", "minLength": 1},
+        "sparse_model": {"type": "string", "minLength": 1},
+        "reranker_model": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"}
+  }
+}

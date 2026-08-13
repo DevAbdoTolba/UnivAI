@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://univai.local/schemas/manual-evaluation-result-v1.json",
+  "title": "UnivAI manual evaluation result",
+  "description": "The normalized JSON form of one row in manual_test_protocols.csv. Blank nullable CSV cells become null, evidence *_json cells are decoded as arrays, and defect_ids is decoded from a pipe-delimited string. Cross-row inventory, date ordering, and embedded-JSON checks are enforced by validate_manual_results.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "x-csv-header": [
+    "case_id",
+    "test_type",
+    "title",
+    "persona",
+    "preconditions",
+    "procedure",
+    "expected_result",
+    "evidence_required",
+    "severity",
+    "status",
+    "tester_id",
+    "execution_date",
+    "environment",
+    "revision",
+    "observed_result",
+    "evidence_refs_json",
+    "defect_ids",
+    "disposition",
+    "remediation",
+    "retest_status",
+    "retest_date",
+    "retest_evidence_refs_json",
+    "approver_id",
+    "signoff_date",
+    "signoff_decision",
+    "result_notes"
+  ],
+  "required": [
+    "case_id",
+    "test_type",
+    "title",
+    "persona",
+    "preconditions",
+    "procedure",
+    "expected_result",
+    "evidence_required",
+    "severity",
+    "status",
+    "tester_id",
+    "execution_date",
+    "environment",
+    "revision",
+    "observed_result",
+    "evidence_refs_json",
+    "defect_ids",
+    "disposition",
+    "remediation",
+    "retest_status",
+    "retest_date",
+    "retest_evidence_refs_json",
+    "approver_id",
+    "signoff_date",
+    "signoff_decision",
+    "result_notes"
+  ],
+  "properties": {
+    "case_id": {
+      "enum": [
+        "UAT-01", "UAT-02", "UAT-03", "UAT-04", "UAT-05", "UAT-06",
+        "UAT-07", "UAT-08", "UAT-09", "UAT-10", "UAT-11", "UAT-12",
+        "UX-01", "UX-02", "UX-03", "UX-04", "UX-05", "UX-06", "UX-07", "UX-08",
+        "PEN-01", "PEN-02", "PEN-03", "PEN-04", "PEN-05", "PEN-06",
+        "PEN-07", "PEN-08", "PEN-09", "PEN-10", "PEN-11", "PEN-12",
+        "PEN-13", "PEN-14", "PEN-15", "PEN-16",
+        "A11Y-01", "A11Y-02", "A11Y-03", "A11Y-04",
+        "A11Y-05", "A11Y-06", "A11Y-07", "A11Y-08"
+      ]
+    },
+    "test_type": {
+      "enum": ["UAT", "Usability", "Manual penetration", "Accessibility"]
+    },
+    "title": {"$ref": "#/$defs/nonEmptyString"},
+    "persona": {"$ref": "#/$defs/nonEmptyString"},
+    "preconditions": {"$ref": "#/$defs/nonEmptyString"},
+    "procedure": {"$ref": "#/$defs/nonEmptyString"},
+    "expected_result": {"$ref": "#/$defs/nonEmptyString"},
+    "evidence_required": {"$ref": "#/$defs/nonEmptyString"},
+    "severity": {"enum": ["critical", "high", "medium", "low"]},
+    "status": {"enum": ["NOT_RUN", "PASS", "FAIL"]},
+    "tester_id": {"$ref": "#/$defs/nullableString"},
+    "execution_date": {"$ref": "#/$defs/nullableDate"},
+    "environment": {"$ref": "#/$defs/nullableString"},
+    "revision": {"$ref": "#/$defs/nullableString"},
+    "observed_result": {"$ref": "#/$defs/nullableString"},
+    "evidence_refs_json": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidenceReference"}
+    },
+    "defect_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{1,63}$"}
+    },
+    "disposition": {"$ref": "#/$defs/nullableString"},
+    "remediation": {"$ref": "#/$defs/nullableString"},
+    "retest_status": {
+      "type": ["string", "null"],
+      "enum": [null, "NOT_RUN", "NOT_REQUIRED", "PASS", "FAIL"]
+    },
+    "retest_date": {"$ref": "#/$defs/nullableDate"},
+    "retest_evidence_refs_json": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidenceReference"}
+    },
+    "approver_id": {"$ref": "#/$defs/nullableString"},
+    "signoff_date": {"$ref": "#/$defs/nullableDate"},
+    "signoff_decision": {
+      "type": ["string", "null"],
+      "enum": [null, "APPROVE", "REJECT"]
+    },
+    "result_notes": {"$ref": "#/$defs/nullableString"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "NOT_RUN"}}},
+      "then": {
+        "properties": {
+          "tester_id": {"type": "null"},
+          "execution_date": {"type": "null"},
+          "environment": {"type": "null"},
+          "revision": {"type": "null"},
+          "observed_result": {"type": "null"},
+          "evidence_refs_json": {"maxItems": 0},
+          "defect_ids": {"maxItems": 0},
+          "disposition": {"type": "null"},
+          "remediation": {"type": "null"},
+          "retest_status": {"type": "null"},
+          "retest_date": {"type": "null"},
+          "retest_evidence_refs_json": {"maxItems": 0},
+          "approver_id": {"type": "null"},
+          "signoff_date": {"type": "null"},
+          "signoff_decision": {"type": "null"},
+          "result_notes": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"enum": ["PASS", "FAIL"]}}},
+      "then": {
+        "properties": {
+          "tester_id": {"$ref": "#/$defs/nonEmptyString"},
+          "execution_date": {"$ref": "#/$defs/date"},
+          "environment": {"$ref": "#/$defs/nonEmptyString"},
+          "revision": {"$ref": "#/$defs/nonEmptyString"},
+          "observed_result": {"$ref": "#/$defs/nonEmptyString"},
+          "evidence_refs_json": {"minItems": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "PASS"}}},
+      "then": {
+        "properties": {
+          "defect_ids": {"maxItems": 0},
+          "disposition": {"type": "null"},
+          "remediation": {"type": "null"},
+          "retest_status": {"type": "null"},
+          "retest_date": {"type": "null"},
+          "retest_evidence_refs_json": {"maxItems": 0},
+          "approver_id": {"$ref": "#/$defs/nonEmptyString"},
+          "signoff_date": {"$ref": "#/$defs/date"},
+          "signoff_decision": {"const": "APPROVE"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "FAIL"}}},
+      "then": {
+        "properties": {
+          "defect_ids": {"minItems": 1},
+          "disposition": {"$ref": "#/$defs/nonEmptyString"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "nullableString": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/nonEmptyString"}
+      ]
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "nullableDate": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/date"}
+      ]
+    },
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_ref", "sha256"],
+      "properties": {
+        "artifact_ref": {"$ref": "#/$defs/nonEmptyString"},
+        "sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+        "description": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    }
+  }
+}

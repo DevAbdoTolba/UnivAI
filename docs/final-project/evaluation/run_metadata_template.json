@@ -1,0 +1,27 @@
+{
+  "schema_version": "univai.evaluation-run-metadata.v2",
+  "capture_protocol_version": "univai.external-capture.v2",
+  "run_id": "REPLACE_WITH_IMMUTABLE_RUN_ID",
+  "environment": "REPLACE_WITH_ENVIRONMENT_NAME",
+  "operator_id": "REPLACE_WITH_NAMED_OPERATOR_ID",
+  "capture_command": "REPLACE_WITH_EXACT_COMMAND_WITHOUT_SECRETS",
+  "captured_at": "REPLACE_WITH_ISO_8601_TIMESTAMP_WITH_TIMEZONE",
+  "dataset_sha256": "REPLACE_WITH_64_CHAR_LOWERCASE_SHA256",
+  "corpus_sha256": "REPLACE_WITH_64_CHAR_LOWERCASE_SHA256",
+  "outputs_sha256": "REPLACE_WITH_64_CHAR_LOWERCASE_SHA256",
+  "citation_mapping_sha256": "REPLACE_WITH_64_CHAR_LOWERCASE_SHA256",
+  "core_git_sha": "REPLACE_WITH_7_TO_40_CHAR_LOWERCASE_GIT_SHA",
+  "app_git_sha": "REPLACE_WITH_7_TO_40_CHAR_LOWERCASE_GIT_SHA",
+  "agent_git_sha": "REPLACE_WITH_7_TO_40_CHAR_LOWERCASE_GIT_SHA",
+  "live_git_sha": "REPLACE_WITH_7_TO_40_CHAR_LOWERCASE_GIT_SHA",
+  "exam_git_sha": "REPLACE_WITH_7_TO_40_CHAR_LOWERCASE_GIT_SHA",
+  "model_configuration": {
+    "provider": "REPLACE_WITH_PROVIDER",
+    "model_id": "REPLACE_WITH_EXACT_MODEL_ID",
+    "prompt_version": "REPLACE_WITH_EXACT_PROMPT_VERSION",
+    "temperature": 0,
+    "embedding_model": "REPLACE_WITH_EXACT_MODEL_ID",
+    "sparse_model": "REPLACE_WITH_EXACT_MODEL_ID",
+    "reranker_model": "REPLACE_WITH_EXACT_MODEL_ID"
+  }
+}
