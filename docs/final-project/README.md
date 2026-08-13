@@ -9,6 +9,8 @@ reproducible evidence assets.
   report with updateable fields.
 - `UnivAI_Final_Project_Documentation_Field_Updated.docx` - Word-paginated copy
   with the TOC and page fields refreshed (55 pages at the evidence freeze).
+- `UnivAI_Final_Project_Documentation_Field_Updated.pdf` - verified 55-page PDF
+  export of the field-updated Word copy.
 - `UnivAI_Final_Project_Documentation.md` - generated editable Markdown mirror.
 - `evaluation/llm_evaluation_dataset.csv` - 72 LLM/RAG cases with proposed
   ground truth pending two-person adjudication.
