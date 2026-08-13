@@ -8,23 +8,28 @@ Their server (UnivAI-Agent/mcp_server.py) speaks **streamable-http**, not stdio,
 and exposes:
 
     retrieve_context(query, user_id, limit, use_reranking, use_query_transform)
-        -> a formatted string, one block per hit:
-           "[1] Source: book.pdf | Page: 2 | Chunk: 4/5 | Score: 0.0000\nContent: ..."
+        -> one HTML-escaped JSON ``retrieved-passage`` envelope per hit. Older
+           servers returned a plain citation header followed by ``Content:``;
+           the parser intentionally accepts both during rolling upgrades.
     ingest_file(file_path, user_id) -> str
     list_documents(user_id) / remove_document(user_id, document_id)
+    remove_collection_document(user_id, collection_id, source_filename)
 
 Two things their contract forces on us:
   * every call needs a user_id — MVP-1 is single-student, so we send RAG_USER_ID.
   * retrieval NEVER returns empty: a vector search always yields nearest
     neighbours, even for a question the book does not cover. So "not in the book"
-    cannot be decided by an empty result. We keep only hits at or above
-    RAG_MIN_SCORE and let the LLM refuse from the passages it is given.
+    cannot be decided by an empty result. We preserve the reranked order and
+    let the LLM refuse from the passages it is given; only a deliberately
+    calibrated non-zero RAG_MIN_SCORE enables an absolute score cutoff.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import json
+from html import unescape
 from pathlib import Path
 
 import asyncio
@@ -43,14 +48,34 @@ RAG_TOOL_SEARCH = os.getenv("RAG_TOOL_SEARCH", "retrieve_context")
 RAG_TOOL_INGEST = os.getenv("RAG_TOOL_INGEST", "ingest_file")
 RAG_TOOL_INGEST_COLLECTION = os.getenv("RAG_TOOL_INGEST_COLLECTION", "ingest_collection")
 RAG_TOOL_PLAN = os.getenv("RAG_TOOL_PLAN", "create_programme_plan")
-# Reranked cross-encoder scores; below this we treat a hit as noise, not evidence.
-RAG_MIN_SCORE = float(os.getenv("RAG_MIN_SCORE", "0"))
+RAG_TOOL_REMOVE_COLLECTION_DOCUMENT = os.getenv(
+    "RAG_TOOL_REMOVE_COLLECTION_DOCUMENT", "remove_collection_document"
+)
+# Cross-encoder scores are model-specific raw logits, not probabilities: a
+# useful top-ranked passage can legitimately have a negative score. Zero is
+# therefore the safe default meaning "ranking only, no absolute cutoff". A
+# deployment may opt into a calibrated, non-zero cutoff for its exact model.
+_RAG_MIN_SCORE_VALUE = float(os.getenv("RAG_MIN_SCORE", "0"))
+RAG_MIN_SCORE: float | None = (
+    None if _RAG_MIN_SCORE_VALUE == 0 else _RAG_MIN_SCORE_VALUE
+)
 
 # Their citation header, e.g.
 #   "[1] Source: book.pdf | Page: 12 | Chunk: 4/5 | Score: 0.9812"
 # The Page field is absent for non-paginated sources, so we read the fields by
 # name rather than by position.
 _HEADER = re.compile(r"^\[\d+\]\s*(?P<fields>.+)$", re.MULTILINE)
+_QUOTED_PASSAGE = re.compile(
+    r'<untrusted-data\s+name="retrieved-passage"\s+encoding="html-escaped">\s*'
+    r"(?P<body>.*?)\s*</untrusted-data>",
+    re.DOTALL,
+)
+_NO_HITS_PREFIXES = ("No relevant documents", "No documents found")
+_FAILURE_PREFIXES = (
+    "Error during retrieval:",
+    "Error during grounded retrieval:",
+    "REFUSED:",
+)
 
 
 def _parse_header(block: str) -> dict[str, str] | None:
@@ -109,13 +134,119 @@ async def _call_tool_inner(tool: str, arguments: dict, leash: float) -> str:
             await session.initialize()
             result = await session.call_tool(tool, arguments)
 
-    return "\n".join(getattr(item, "text", "") for item in result.content).strip()
+    rendered = "\n".join(getattr(item, "text", "") for item in result.content).strip()
+    if getattr(result, "isError", False):
+        detail = rendered[:240] or "the MCP tool returned an error"
+        raise RagUnavailable(f"RAG tool '{tool}' failed: {detail}")
+    return rendered
+
+
+def _fields_to_hit(fields: dict[str, str], content: str) -> dict:
+    page = fields.get("page")
+    try:
+        score = float(fields.get("score", 0))
+    except ValueError:
+        score = 0.0
+    return {
+        "source": fields.get("source", ""),
+        "page": int(page) if page and page.isdigit() else None,
+        "score": score,
+        "text": content.strip(),
+        "chunk_id": fields.get("chunk", ""),
+    }
+
+
+def _parse_quoted_hits(formatted: str) -> list[dict]:
+    """Decode the MCP's prompt-safe passage envelopes back into data.
+
+    ``quote_untrusted_data`` HTML-escapes a JSON object. Treating that transport
+    rendering as the old citation string caused every successful retrieval to
+    parse as zero hits, which in turn produced a false "not covered" answer.
+    """
+    hits: list[dict] = []
+    for match in _QUOTED_PASSAGE.finditer(formatted):
+        try:
+            payload = json.loads(unescape(match.group("body")))
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        citation = payload.get("citation")
+        content = payload.get("content")
+        if not isinstance(citation, str) or not isinstance(content, str):
+            continue
+        fields = _parse_header(citation)
+        if fields and content.strip():
+            hits.append(_fields_to_hit(fields, content))
+    return hits
+
+
+def _parse_grounded_json(formatted: str) -> list[dict] | None:
+    """Accept the MCP's structured grounded contract when configured.
+
+    Returning ``None`` means the payload was not that contract; returning an
+    empty list means it was a valid, explicit grounded refusal.
+    """
+    try:
+        payload = json.loads(formatted)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict) or "grounded" not in payload:
+        return None
+    if payload.get("grounded") is not True:
+        return []
+
+    hits: list[dict] = []
+    for passage in payload.get("passages") or []:
+        if not isinstance(passage, dict):
+            continue
+        citation = passage.get("citation") or {}
+        if not isinstance(citation, dict):
+            continue
+        content = passage.get("content")
+        if not isinstance(content, str) or not content.strip():
+            continue
+        page = citation.get("page")
+        chunk_index = citation.get("chunk_index")
+        hits.append(
+            {
+                "source": str(
+                    citation.get("source_filename")
+                    or citation.get("book_title")
+                    or ""
+                ).strip(),
+                "page": page if isinstance(page, int) and not isinstance(page, bool) else None,
+                "score": float(passage.get("score") or 0.0),
+                "text": content.strip(),
+                "chunk_id": "" if chunk_index is None else str(chunk_index),
+            }
+        )
+    return hits
+
+
+def _is_explicit_no_hits(formatted: str) -> bool:
+    stripped = formatted.strip()
+    if any(stripped.startswith(prefix) for prefix in _NO_HITS_PREFIXES):
+        return True
+    try:
+        structured = json.loads(stripped)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(structured, dict) and structured.get("grounded") is False
 
 
 def parse_hits(formatted: str) -> list[dict]:
     """Turn their formatted string back into {page, text, score, source} records."""
-    if not formatted or formatted.startswith("No relevant documents"):
+    if not formatted or any(formatted.startswith(prefix) for prefix in _NO_HITS_PREFIXES):
         return []
+
+    structured = _parse_grounded_json(formatted)
+    if structured is not None:
+        return structured
+
+    quoted = _parse_quoted_hits(formatted)
+    if quoted:
+        return quoted
 
     hits: list[dict] = []
     for block in re.split(r"\n-{3,}\n", formatted):
@@ -124,20 +255,7 @@ def parse_hits(formatted: str) -> list[dict]:
             continue
 
         _, _, content = block.partition("Content:")
-        page = fields.get("page")
-        try:
-            score = float(fields.get("score", 0))
-        except ValueError:
-            score = 0.0
-
-        hits.append(
-            {
-                "source": fields.get("source", ""),
-                "page": int(page) if page and page.isdigit() else None,
-                "score": score,
-                "text": content.strip() or block.strip(),
-            }
-        )
+        hits.append(_fields_to_hit(fields, content.strip() or block.strip()))
     return hits
 
 
@@ -163,7 +281,15 @@ async def search_book(query: str, top_k: int = 5, user_id: str | None = None) ->
             "use_reranking": True,
         },
     )
+    if any(formatted.startswith(prefix) for prefix in _FAILURE_PREFIXES):
+        raise RagUnavailable("RAG retrieval failed instead of returning passages")
     hits = parse_hits(formatted)
+    if not hits and formatted.strip() and not _is_explicit_no_hits(formatted):
+        # An MCP schema change or an operational error must never be presented
+        # to the learner as evidence that their book lacks the answer.
+        raise RagUnavailable("RAG returned an unrecognized retrieval response")
+    if RAG_MIN_SCORE is None:
+        return hits
     return [hit for hit in hits if hit["score"] >= RAG_MIN_SCORE]
 
 
@@ -188,6 +314,23 @@ async def ingest_collection(
             "user_id": user_id,
         },
         timeout=RAG_INGEST_TIMEOUT_S,
+    )
+
+
+async def remove_collection_document(
+    user_id: str,
+    collection_id: str,
+    source_filename: str,
+) -> str:
+    """Remove one learner-owned collection source from the vector index."""
+    return await _call_tool(
+        RAG_TOOL_REMOVE_COLLECTION_DOCUMENT,
+        {
+            "user_id": user_id,
+            "collection_id": collection_id,
+            "source_filename": source_filename,
+        },
+        timeout=300,
     )
 
 

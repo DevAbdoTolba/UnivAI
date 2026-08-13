@@ -30,11 +30,11 @@ function Say($text)  { Write-Host "==> $text" -ForegroundColor Cyan }
 function Warn($text) { Write-Host $text -ForegroundColor Yellow }
 
 function Invoke-Sql($sqlFile) {
-    Get-Content $sqlFile -Raw | docker exec -i univai-db psql -U univai -d univai -v ON_ERROR_STOP=1 | Out-Null
+    Get-Content $sqlFile -Raw | docker exec -i -e "PGOPTIONS=--client-min-messages=warning" univai-db psql -U univai -d univai -v ON_ERROR_STOP=1 | Out-Null
 }
 
 function Invoke-SqlText($sql, $psqlArgs = @()) {
-    $sql | docker exec -i univai-db psql -U univai -d univai -v ON_ERROR_STOP=1 @psqlArgs
+    $sql | docker exec -i -e "PGOPTIONS=--client-min-messages=warning" univai-db psql -U univai -d univai -v ON_ERROR_STOP=1 @psqlArgs
 }
 
 function Read-DotEnvValue($name) {
@@ -191,20 +191,36 @@ function Target-Up {
 # Both stop the RAG server first: it is detached, so taking its Qdrant away
 # without stopping it leaves it answering :8000 against a store that is gone.
 function Target-Down   { Target-RagStop; docker @Compose down }
-function Target-Clean  { Target-RagStop; docker @Compose down -v; Warn "containers and volumes removed" }
+function Target-Clean  { Target-RagStop; docker @Compose down -v; Warn "local Postgres, Qdrant, and Mongo volumes removed; host files kept" }
 function Target-Schema {
     Invoke-Sql "infra/schema.sql"
     $migrations = Get-ChildItem -LiteralPath "infra/migrations" -Filter "*.sql" |
         Where-Object { $_.Name -match '^(\d+)_([^.]+)\.sql$' } |
         Sort-Object Name
+    $applied = 0
+    $skipped = 0
     foreach ($migration in $migrations) {
         if ($migration.Name -notmatch '^(\d+)_([^.]+)\.sql$') { continue }
         $version = [int]$Matches[1]
-        $name = $Matches[2].Replace("'", "''")
+        $name = $Matches[2]
+        $existingName = @(
+            Invoke-SqlText -sql "SELECT name FROM core_schema_migrations WHERE version = $version;" -psqlArgs @("-Atq")
+        ) -join "`n"
+        $existingName = $existingName.Trim()
+        if ($existingName) {
+            if ($existingName -ne $name) {
+                throw "Migration version $version is already recorded as '$existingName', not '$name'. Never rename or reuse a migration version."
+            }
+            $skipped++
+            continue
+        }
+
         Invoke-Sql $migration.FullName
-        Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES ($version, '$name') ON CONFLICT (version) DO NOTHING;" | Out-Null
+        $sqlName = $name.Replace("'", "''")
+        Invoke-SqlText "INSERT INTO core_schema_migrations (version, name) VALUES ($version, '$sqlName');" | Out-Null
+        $applied++
     }
-    Write-Host "base schema and $($migrations.Count) migrations applied" -ForegroundColor Green
+    Write-Host "base schema applied; $applied migration(s) applied, $skipped already current" -ForegroundColor Green
 }
 function Target-Migrate { Target-Schema }
 function Target-SeedData { Invoke-Sql "infra/seed.sql"; Write-Host "seed data applied" -ForegroundColor Green }

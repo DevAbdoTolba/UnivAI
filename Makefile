@@ -50,7 +50,7 @@ PY := .venv/Scripts/python.exe
 else
 PY := .venv/bin/python
 endif
-DB       := docker exec -i univai-db psql -U univai -d univai -v ON_ERROR_STOP=1
+DB       := docker exec -i -e PGOPTIONS=--client-min-messages=warning univai-db psql -U univai -d univai -v ON_ERROR_STOP=1
 # 3100, not 3000: the exam system's "back to UnivAI" buttons point at 3100
 # (UNIVAI_APP_URL in UnivAI-exam_system/.env.local). Keep them in step.
 APP_PORT ?= 3100
@@ -294,23 +294,30 @@ up: ## Start Postgres + Qdrant + Mongo, then apply the schema
 down: rag-stop ## Stop Postgres + Qdrant + the RAG server (data is kept)
 	$(COMPOSE) down
 
-# Applies every infra/migrations/NNN_name.sql in numeric order and records it in
-# the core_schema_migrations ledger. The list used to be spelled out here, one
-# hand-written pair of lines per migration, so adding a migration meant
-# remembering to wire it up — and a migration that was never wired up still
-# looked applied. Reading the directory removes that step entirely.
-schema: ## Apply infra/schema.sql + every infra/migrations/*.sql (idempotent)
+# Applies each pending infra/migrations/NNN_name.sql in numeric order. The
+# core_schema_migrations ledger is authoritative; an applied version is never
+# run again, and renaming or reusing it fails loudly.
+schema: ## Apply infra/schema.sql + pending infra/migrations/*.sql
 	@$(DB) < infra/schema.sql > /dev/null
-	@count=0; \
+	@applied=0; skipped=0; \
 	for file in $$(ls infra/migrations/[0-9]*_*.sql | sort); do \
 		base=$$(basename "$$file" .sql); \
 		version=$$(echo "$$base" | cut -d_ -f1 | sed 's/^0*//'); \
 		name=$$(echo "$$base" | cut -d_ -f2-); \
+		existing_name="$$( $(DB) -Atq -c "SELECT name FROM core_schema_migrations WHERE version = $$version" )"; \
+		if [ -n "$$existing_name" ]; then \
+			if [ "$$existing_name" != "$$name" ]; then \
+				echo "ERROR: migration version $$version is recorded as '$$existing_name', not '$$name'" >&2; \
+				exit 1; \
+			fi; \
+			skipped=$$((skipped + 1)); \
+			continue; \
+		fi; \
 		$(DB) < "$$file" > /dev/null || exit 1; \
-		$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES ($$version, '$$name') ON CONFLICT (version) DO NOTHING" > /dev/null || exit 1; \
-		count=$$((count + 1)); \
+		$(DB) -c "INSERT INTO core_schema_migrations (version, name) VALUES ($$version, '$$name')" > /dev/null || exit 1; \
+		applied=$$((applied + 1)); \
 	done; \
-	echo "base schema and $$count migrations applied"
+	echo "base schema applied; $$applied migration(s) applied, $$skipped already current"
 
 migrate: schema ## Apply database migrations/schema
 
@@ -701,6 +708,6 @@ status: ## Show what is running
 
 clean: rag-stop ## Remove containers AND their volumes. Destroys the database and the vectors
 	$(COMPOSE) down -v
-	@echo "containers and volumes removed"
+	@echo "local Postgres, Qdrant, and Mongo volumes removed; host files kept"
 
 endif

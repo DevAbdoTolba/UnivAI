@@ -21,6 +21,7 @@ def test_rag_tool_entrypoints_bootstrap_campus_imports(tmp_path: Path) -> None:
     for relative_path, usage in (
         ("services/rag-tools/rag_ingest.py", "usage: rag_ingest.py"),
         ("services/rag-tools/rag_admin.py", "usage: rag_admin.py"),
+        ("services/rag-tools/rag_delete.py", "usage: rag_delete.py"),
     ):
         result = subprocess.run(
             [sys.executable, str(ROOT / relative_path)],

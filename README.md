@@ -44,7 +44,8 @@ book.pdf ──▶ RAG (index it) ──▶ course generator (LLM) ──▶ Pos
 |---|---|
 | [docs/running.md](docs/running.md) | **How to run it** — every service by hand, step by step, then the one-command way |
 | [docs/architecture.md](docs/architecture.md) | The moving parts, their ports, and how data flows between them |
-| [docs/admin.md](docs/admin.md) | The SUDO panel: virtual clock, course-size dial, restart semester |
+| [docs/admin.md](docs/admin.md) | The SUDO panel: virtual clock, learner records, controls, and semester recovery |
+| [docs/final-exam-recovery-and-retake.md](docs/final-exam-recovery-and-retake.md) | Final-session recovery, two-form retakes, deadlines, grade finalization, and operations |
 
 ## Repo layout
 

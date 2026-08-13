@@ -40,13 +40,16 @@ Set-Location UnivAI
 | `make down` | `./run.ps1 down` | Stop containers and preserve volumes. |
 | `make clean` | `./run.ps1 clean` | Destructively remove local integration volumes. |
 
+For a completely blank local database and vector store, run `clean` followed by
+`up`. This keeps repository files, uploads, caches, and standalone test volumes.
+
 The deterministic smoke never invokes a real course LLM, camera, microphone,
 TTS, or STT model. Real-provider checks are optional and explicit.
 
-`make schema` and `./run.ps1 schema` apply the MVP-1 base followed by migrations
-`002_final_mvp.sql`, `003_sprint3_learning_flow.sql`, and
-`004_app_library.sql`. Applied versions are recorded in
-`core_schema_migrations`; all scripts remain idempotent.
+`make schema` and `./run.ps1 schema` apply the MVP-1 base followed by every
+pending numbered migration in `infra/migrations/`. Applied versions are
+recorded in `core_schema_migrations` and skipped on later starts. Renaming or
+reusing an applied version fails instead of silently running the wrong file.
 
 ## Sprint 3 integrated gate
 

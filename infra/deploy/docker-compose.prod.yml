@@ -41,6 +41,7 @@ services:
       DATABASE_URL: postgresql://univai:${POSTGRES_PASSWORD}@postgres:5432/univai
       RAG_MCP_URL: http://agent:8000/mcp
       EXAM_SYSTEM_URL: http://exam:3200
+      EXAM_CALLBACK_SECRET: ${EXAM_CALLBACK_SECRET:?EXAM_CALLBACK_SECRET is required}
       LIVEKIT_URL: ws://livekit:7880
       NEXT_PUBLIC_LIVEKIT_URL: wss://${DOMAIN:-localhost}/livekit
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
@@ -149,6 +150,8 @@ services:
       PORT: "3200"
       MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-univai}:${MONGO_ROOT_PASSWORD}@mongo:27017/univai_exams?authSource=admin
       UNIVAI_APP_URL: https://${DOMAIN:-localhost}
+      RESULT_WEBHOOK_URL: http://app:3100/api/exams/callback
+      EXAM_CALLBACK_SECRET: ${EXAM_CALLBACK_SECRET:?EXAM_CALLBACK_SECRET is required}
       REQUEST_ID_HEADER: X-Request-ID
       RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-30}
       RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}

@@ -3,6 +3,7 @@
 -- team's existing RAG service. This app never stores or indexes book text.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- The virtual clock. Exactly one row (id = 1). Nothing else in the system
 -- may read the wall clock; see ClockService (app/lib/clock.ts, services/common/clock.py).
@@ -35,8 +36,8 @@ CREATE TABLE IF NOT EXISTS lectures (
   UNIQUE (week)
 );
 
--- Attendance: TRACKING ONLY in MVP-1. No penalties, no enforcement.
--- 'absent' is never stored: it is derived at read time from the virtual clock.
+-- Attendance arrival is stored; coverage classifications are derived from the
+-- durable sentence checkpoint so policy never goes stale in a status column.
 CREATE TABLE IF NOT EXISTS attendance (
   id           SERIAL PRIMARY KEY,
   lecture_id   INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
@@ -66,12 +67,31 @@ CREATE TABLE IF NOT EXISTS qa_log (
   answer     TEXT NOT NULL,
   citations  JSONB NOT NULL DEFAULT '[]'::jsonb,
   model_used TEXT,
-  asked_at   TIMESTAMPTZ NOT NULL                 -- virtual time
+  asked_at   TIMESTAMPTZ NOT NULL,                -- virtual time
+  trace_id   TEXT NOT NULL DEFAULT gen_random_uuid()::text
 );
+ALTER TABLE qa_log ADD COLUMN IF NOT EXISTS trace_id TEXT;
+UPDATE qa_log
+   SET trace_id = gen_random_uuid()::text
+ WHERE trace_id IS NULL OR btrim(trace_id) = '';
+ALTER TABLE qa_log ALTER COLUMN trace_id SET DEFAULT gen_random_uuid()::text;
+ALTER TABLE qa_log ALTER COLUMN trace_id SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS qa_log_trace_id_key ON qa_log(trace_id);
 
 -- The student finished watching this lecture (the Lecturer agent reached the end).
 -- A finished lecture cannot be re-opened.
 ALTER TABLE attendance ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+-- Live presence and a durable sentence checkpoint. The worker updates these as
+-- it teaches so refreshes, network reconnects, and worker restarts do not reset
+-- the learner to sentence zero. Migration 026 adds validation constraints.
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS attended_seconds DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS is_connected BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS presence_last_seen_at TIMESTAMPTZ;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS last_connected_at TIMESTAMPTZ;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS last_disconnected_at TIMESTAMPTZ;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS disconnect_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS last_sentence_index INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS total_sentences INTEGER NOT NULL DEFAULT 0;
 
 -- Exam results arriving from the exam system's webhook carry a proctoring
 -- report; we keep it so the admin can judge whether an attempt has a problem.
@@ -171,11 +191,124 @@ CREATE TABLE IF NOT EXISTS "user" (
   "banExpires"    timestamptz,
   -- NULL = not given. Google sign-in supplies no phone number (migration 011).
   "phone"         text,
-  "registrationNumber"     text
+  "registrationNumber"     text,
+  "uiLocale"      text NOT NULL DEFAULT 'en' CHECK ("uiLocale" IN ('en', 'ar')),
+  "eulaAccepted"  boolean NOT NULL DEFAULT false,
+  "eulaVersion"   text,
+  "eulaAcceptedAt" timestamptz,
+  "privacyNoticeAcknowledged" boolean NOT NULL DEFAULT false,
+  "privacyNoticeVersion" text,
+  "privacyNoticeAcknowledgedAt" timestamptz
 );
 -- registrationNumber is server-assigned and must be globally unique (nulls allowed only
 -- transiently). Unique INDEX (not a table constraint) keeps this idempotent.
 CREATE UNIQUE INDEX IF NOT EXISTS "user_registrationNumber_key" ON "user" ("registrationNumber");
+
+CREATE TABLE IF NOT EXISTS legal_acceptances (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  registration_number TEXT,
+  document_type TEXT NOT NULL CHECK (document_type IN ('eula', 'privacy_notice')),
+  document_version TEXT NOT NULL,
+  document_hash TEXT NOT NULL,
+  context TEXT NOT NULL CHECK (context IN ('email_signup', 'oauth_signup', 'upload', 'settings')),
+  locale TEXT NOT NULL CHECK (locale IN ('en', 'ar')),
+  accepted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ip_address TEXT,
+  user_agent TEXT
+);
+CREATE INDEX IF NOT EXISTS legal_acceptances_user_created_idx
+  ON legal_acceptances(user_id, accepted_at DESC);
+CREATE INDEX IF NOT EXISTS legal_acceptances_registration_created_idx
+  ON legal_acceptances(registration_number, accepted_at DESC);
+
+CREATE TABLE IF NOT EXISTS privacy_preferences (
+  user_id UUID PRIMARY KEY REFERENCES "user"("id") ON DELETE CASCADE,
+  sale_or_sharing_opt_out BOOLEAN NOT NULL DEFAULT FALSE,
+  limit_sensitive_data_use BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS privacy_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  registration_number TEXT,
+  request_type TEXT NOT NULL CHECK (request_type IN (
+    'access', 'deletion', 'correction', 'portability', 'restriction',
+    'objection', 'sale_share_opt_out', 'limit_sensitive_use'
+  )),
+  status TEXT NOT NULL DEFAULT 'received' CHECK (status IN (
+    'received', 'identity_check', 'in_progress', 'completed', 'declined', 'cancelled'
+  )),
+  detail TEXT,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  due_at TIMESTAMPTZ NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 days'),
+  identity_verified_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  admin_note TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS privacy_requests_user_created_idx
+  ON privacy_requests(user_id, submitted_at DESC);
+CREATE INDEX IF NOT EXISTS privacy_requests_queue_idx
+  ON privacy_requests(status, due_at, submitted_at);
+CREATE INDEX IF NOT EXISTS user_admin_created_idx
+  ON "user"("createdAt" DESC, "id" DESC);
+CREATE INDEX IF NOT EXISTS user_admin_name_search_idx
+  ON "user" USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS user_admin_email_search_idx
+  ON "user" USING GIN (email gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS user_admin_registration_search_idx
+  ON "user" USING GIN ("registrationNumber" gin_trgm_ops);
+
+CREATE TABLE IF NOT EXISTS ai_output_reactions (
+  id BIGSERIAL PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  target_type TEXT NOT NULL CHECK (target_type IN (
+    'raise_hand_answer', 'lecture', 'section', 'curriculum'
+  )),
+  target_id TEXT NOT NULL CHECK (length(target_id) BETWEEN 1 AND 200),
+  target_version TEXT NOT NULL CHECK (length(target_version) BETWEEN 1 AND 200),
+  trace_id TEXT NOT NULL CHECK (length(trace_id) BETWEEN 1 AND 300),
+  rating SMALLINT CHECK (rating BETWEEN 1 AND 5),
+  liked BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (student_id, target_type, target_id, target_version)
+);
+CREATE INDEX IF NOT EXISTS ai_output_reactions_target_idx
+  ON ai_output_reactions(target_type, target_id, target_version);
+CREATE INDEX IF NOT EXISTS ai_output_reactions_student_updated_idx
+  ON ai_output_reactions(student_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS ai_output_reports (
+  id BIGSERIAL PRIMARY KEY,
+  student_id TEXT NOT NULL,
+  target_type TEXT NOT NULL CHECK (target_type IN (
+    'raise_hand_answer', 'lecture', 'section', 'curriculum'
+  )),
+  target_id TEXT NOT NULL CHECK (length(target_id) BETWEEN 1 AND 200),
+  target_version TEXT NOT NULL CHECK (length(target_version) BETWEEN 1 AND 200),
+  trace_id TEXT NOT NULL CHECK (length(trace_id) BETWEEN 1 AND 300),
+  reason TEXT NOT NULL CHECK (reason IN (
+    'incorrect', 'unsupported_or_uncited', 'irrelevant',
+    'unsafe_or_inappropriate', 'copyright_or_privacy', 'technical_issue'
+  )),
+  detail TEXT CHECK (detail IS NULL OR length(detail) <= 2000),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN (
+    'pending', 'reviewing', 'resolved', 'dismissed'
+  )),
+  admin_note TEXT CHECK (admin_note IS NULL OR length(admin_note) <= 2000),
+  reviewed_by UUID REFERENCES "user"("id") ON DELETE SET NULL,
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (student_id, target_type, target_id, target_version)
+);
+CREATE INDEX IF NOT EXISTS ai_output_reports_queue_idx
+  ON ai_output_reports(status, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS ai_output_reports_target_idx
+  ON ai_output_reports(target_type, target_id, target_version);
 
 CREATE TABLE IF NOT EXISTS "session" (
   "id"             uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -217,6 +350,56 @@ CREATE TABLE IF NOT EXISTS "verification" (
 );
 CREATE INDEX IF NOT EXISTS "verification_identifier_idx" ON "verification" ("identifier");
 
+-- Final-exam recovery and retake lifecycle. Scores stay provisional until the
+-- request window closes, an administrator declines, or the reserve form is
+-- completed. The numbered migration carries the same definition for upgrades.
+CREATE TABLE IF NOT EXISTS final_exam_cases (
+  student_id TEXT NOT NULL,
+  curriculum_id TEXT NOT NULL,
+  primary_opens_at TIMESTAMPTZ NOT NULL,
+  primary_closes_at TIMESTAMPTZ NOT NULL,
+  request_deadline TIMESTAMPTZ NOT NULL,
+  primary_exam_id TEXT,
+  primary_submitted_at TIMESTAMPTZ,
+  primary_result JSONB,
+  retake_requested_at TIMESTAMPTZ,
+  retake_reason TEXT,
+  retake_available_at TIMESTAMPTZ,
+  retake_closes_at TIMESTAMPTZ,
+  retake_exam_id TEXT,
+  retake_submitted_at TIMESTAMPTZ,
+  retake_result JSONB,
+  declined_at TIMESTAMPTZ,
+  declined_by UUID REFERENCES "user" ("id") ON DELETE SET NULL,
+  decline_reason TEXT,
+  finalized_at TIMESTAMPTZ,
+  finalization_reason TEXT CHECK (
+    finalization_reason IS NULL OR finalization_reason IN (
+      'request_window_expired', 'retake_declined',
+      'retake_completed', 'retake_not_taken'
+    )
+  ),
+  official_exam_id TEXT,
+  official_result JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (student_id, curriculum_id),
+  CHECK (primary_closes_at > primary_opens_at),
+  CHECK (request_deadline > primary_closes_at),
+  CHECK (
+    (retake_requested_at IS NULL AND retake_available_at IS NULL AND retake_closes_at IS NULL)
+    OR
+    (retake_requested_at IS NOT NULL AND retake_available_at > retake_requested_at
+      AND retake_closes_at > retake_available_at)
+  )
+);
+CREATE INDEX IF NOT EXISTS final_exam_cases_request_queue_idx
+  ON final_exam_cases (retake_requested_at, retake_available_at)
+  WHERE finalized_at IS NULL AND declined_at IS NULL;
+CREATE INDEX IF NOT EXISTS final_exam_cases_reconcile_idx
+  ON final_exam_cases (request_deadline, retake_closes_at)
+  WHERE finalized_at IS NULL;
+
 -- Subscriptions never gate academic access. Paid plans only increase the
 -- weekly allowance for optional visual personalization.
 CREATE TABLE IF NOT EXISTS user_subscriptions (
@@ -231,6 +414,9 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
                               CHECK (provider IN ('none', 'paypal')),
   provider_subscription_id  text UNIQUE,
   provider_plan_id          text,
+  subscribed_at             timestamptz,
+  current_period_ends_at    timestamptz,
+  cancelled_at              timestamptz,
   created_at                timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -326,7 +512,7 @@ CREATE TABLE IF NOT EXISTS notification_email_outbox (
   subject       text NOT NULL CHECK (length(subject) BETWEEN 1 AND 180),
   text_body     text NOT NULL CHECK (length(text_body) BETWEEN 1 AND 8000),
   status        text NOT NULL DEFAULT 'pending'
-                  CHECK (status IN ('pending', 'processing', 'sent', 'failed')),
+                  CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'skipped')),
   attempts      integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 8),
   available_at  timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   locked_at     timestamptz,
@@ -347,6 +533,39 @@ CREATE INDEX IF NOT EXISTS notification_email_outbox_dispatch_idx
 
 CREATE INDEX IF NOT EXISTS notification_email_outbox_user_idx
   ON notification_email_outbox (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS notification_email_outbox_monitor_idx
+  ON notification_email_outbox (user_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS notification_email_outbox_global_feed_idx
+  ON notification_email_outbox (created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS notification_email_outbox_filter_idx
+  ON notification_email_outbox (status, category, event_type, created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS notification_email_delivery_log (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
+  category    text NOT NULL
+                CHECK (category IN (
+                  'course', 'lecture', 'assessment', 'transcript', 'security', 'billing'
+                )),
+  event_type  text NOT NULL CHECK (length(event_type) BETWEEN 1 AND 80),
+  subject     text NOT NULL CHECK (length(subject) BETWEEN 1 AND 180),
+  status      text NOT NULL DEFAULT 'queued'
+                CHECK (status IN ('queued', 'sent', 'failed', 'skipped')),
+  attempts    integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 1),
+  last_error  text,
+  sent_at     timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS notification_email_delivery_log_monitor_idx
+  ON notification_email_delivery_log (user_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS notification_email_delivery_log_global_feed_idx
+  ON notification_email_delivery_log (created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS notification_email_delivery_log_filter_idx
+  ON notification_email_delivery_log (status, category, event_type, created_at DESC, id DESC);
+
 
 CREATE TABLE IF NOT EXISTS user_rate_limit_policies (
   user_id          uuid NOT NULL REFERENCES "user" ("id") ON DELETE CASCADE,
