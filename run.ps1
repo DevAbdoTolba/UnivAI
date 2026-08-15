@@ -644,7 +644,7 @@ function Target-Status {
     $ragUp   = Test-TcpPort $RagPort
     $qdrantUp = Test-QdrantReady
     $lkUp    = Test-Url "http://127.0.0.1:7880"
-    $notificationsUp = Test-Path "logs/notifications.pid" -and
+    $notificationsUp = (Test-Path "logs/notifications.pid") -and
         [bool](Get-Process -Id ([int](Get-Content "logs/notifications.pid" -Raw)) -ErrorAction SilentlyContinue)
     Write-Host ("app    :{0}  {1}" -f $AppPort, $(if ($appUp) { "up" } else { "down" }))
     Write-Host ("exams  :3200  {0}" -f $(if ($examsUp) { "up" } else { "down" }))
