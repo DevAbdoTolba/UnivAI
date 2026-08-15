@@ -3,7 +3,7 @@
 #   ./run.ps1              list the targets
 #   ./run.ps1 setup        install node deps, python venv, RAG deps
 #   ./run.ps1 up           start Postgres + Qdrant and apply the schema
-#   ./run.ps1 dev          start everything (RAG + app + worker), each in its own window
+#   ./run.ps1 dev          start everything, including the notification dispatcher
 #   ./run.ps1 dev-restart  restart the complete dev stack after editing .env
 #
 # Same target names as the Makefile. Keep the two in step.
@@ -92,6 +92,7 @@ function Target-Help {
         @("app",    "Run the Next.js app            (:$AppPort)"),
         @("worker", "Run the live-lecture voice agent (needs LIVEKIT_* keys)"),
         @("exams",  "Run the exam system (:3200)"),
+        @("notifications", "Run the durable notification dispatcher"),
         @("slides", "Build the Slidev decks to UnivAI-app/public/slides/"),
         @("dev",    "Check prerequisites, then start RAG + app + worker + exams"),
         @("dev-stop","Stop app, worker and exams; keep RAG and containers running"),
@@ -485,6 +486,9 @@ function Target-App    { Push-Location UnivAI-app; npx next dev -p $AppPort; Pop
 function Target-Worker { & $Py UnivAI-live/worker.py dev }
 function Target-Slides { Write-Host "No slide build is required; slides are rendered from Postgres." -ForegroundColor Green }
 function Target-Exams  { Push-Location UnivAI-exam_system; node --env-file=../.env --import tsx server.ts dev; Pop-Location }
+function Target-Notifications {
+    node --env-file=.env UnivAI-app/scripts/notification-dispatcher.mjs --url "http://localhost:$AppPort"
+}
 
 function Assert-DevPrerequisites {
     $setupPaths = @(".env", $Py, "UnivAI-app/node_modules", "UnivAI-exam_system/node_modules", "UnivAI-Agent/.venv")
@@ -547,7 +551,7 @@ function Target-Dev {
             Warn "WARNING: Ollama is not installed or not on PATH; continuing without waking it."
         }
     }
-    Say "launching RAG, app and worker in separate windows"
+    Say "launching RAG, app, worker, exams, and notifications"
     $root = $PSScriptRoot
     New-Item -ItemType Directory -Force -Path "logs" | Out-Null
     # RAG detaches itself and logs to a file, so it needs no window and no wait.
@@ -555,9 +559,15 @@ function Target-Dev {
     $appProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" -PassThru
     $workerProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 worker" -PassThru
     $examProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams" -PassThru
+    $notificationProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 notifications -AppPort $AppPort" `
+        -RedirectStandardOutput "logs/notifications.out.log" `
+        -RedirectStandardError "logs/notifications.error.log" `
+        -WindowStyle Hidden -PassThru
     $appProcess.Id | Set-Content "logs/app.pid"
     $workerProcess.Id | Set-Content "logs/worker.pid"
     $examProcess.Id | Set-Content "logs/exams.pid"
+    $notificationProcess.Id | Set-Content "logs/notifications.pid"
 
     Write-Host ""
     Write-Host "  app    http://localhost:$AppPort"           -ForegroundColor Green
@@ -616,7 +626,7 @@ function Stop-DevProcess([string]$Name) {
 }
 
 function Target-DevStop {
-    foreach ($name in @("app", "exams", "worker")) { Stop-DevProcess $name }
+    foreach ($name in @("notifications", "app", "exams", "worker")) { Stop-DevProcess $name }
 }
 
 function Target-DevRestart {
@@ -634,11 +644,14 @@ function Target-Status {
     $ragUp   = Test-TcpPort $RagPort
     $qdrantUp = Test-QdrantReady
     $lkUp    = Test-Url "http://127.0.0.1:7880"
+    $notificationsUp = Test-Path "logs/notifications.pid" -and
+        [bool](Get-Process -Id ([int](Get-Content "logs/notifications.pid" -Raw)) -ErrorAction SilentlyContinue)
     Write-Host ("app    :{0}  {1}" -f $AppPort, $(if ($appUp) { "up" } else { "down" }))
     Write-Host ("exams  :3200  {0}" -f $(if ($examsUp) { "up" } else { "down" }))
     Write-Host ("RAG    :{0}  {1}"  -f $RagPort, $(if ($ragUp) { "up" } else { "down" }))
     Write-Host ("qdrant :6333  {0}"  -f $(if ($qdrantUp) { "up" } else { "down" }))
     Write-Host ("livekit:7880  {0}"  -f $(if ($lkUp) { "up" } else { "down" }))
+    Write-Host ("notifications  {0}" -f $(if ($notificationsUp) { "up" } else { "down" }))
 
     if ($appUp) {
         $clock = Invoke-RestMethod "http://localhost:$AppPort/api/clock"
@@ -675,6 +688,7 @@ switch ($Target.ToLower()) {
     "app"    { Target-App }
     "worker" { Target-Worker }
     "exams"  { Target-Exams }
+    "notifications" { Target-Notifications }
     "slides" { Target-Slides }
     "dev"    { Target-Dev }
     "dev-stop" { Target-DevStop }

@@ -536,8 +536,8 @@ dev-check:
 	fi; \
 	echo "development prerequisites are ready"
 
-dev: dev-check ## Start RAG + app + worker + exams; requires setup, models and infra
-	@echo "==> launching RAG, app, worker and exams"
+dev: dev-check ## Start RAG + app + worker + exams + notifications
+	@echo "==> launching RAG, app, worker, exams and notifications"
 ifeq ($(OS),Windows_NT)
 # On Windows the ollama CLI starts the daemon app when it is not running.
 	@curl -s -m 2 http://127.0.0.1:11434 >/dev/null 2>&1 || (echo "==> waking Ollama" && ollama list >/dev/null 2>&1)
@@ -547,6 +547,8 @@ ifeq ($(OS),Windows_NT)
 	@start "UnivAI app"    //D UnivAI-app cmd //k "npx next dev -p $(APP_PORT)"
 	@start "UnivAI worker" cmd //k ".venv\Scripts\python.exe UnivAI-live\worker.py dev"
 	@start "UnivAI exams"  //D UnivAI-exam_system cmd //k "npm run dev"
+	@mkdir -p logs
+	@start "UnivAI notifications" //B cmd //c "node --env-file=.env UnivAI-app\scripts\notification-dispatcher.mjs --url http://localhost:$(APP_PORT) > logs\notifications.log 2>&1"
 else
 	@mkdir -p logs
 	@$(MAKE) --no-print-directory rag-server RAG_WAIT=0
@@ -597,6 +599,12 @@ else
 		echo "==> starting app (log: logs/app.log)"; \
 		nohup setsid sh -c 'cd UnivAI-app && exec npx next dev -p $(APP_PORT)' </dev/null > logs/app.log 2>&1 & echo $$! > logs/app.pid; \
 	fi; \
+	if [ -f logs/notifications.pid ] && kill -0 "$$(cat logs/notifications.pid 2>/dev/null)" 2>/dev/null; then \
+		echo "notification dispatcher is already running"; \
+	else \
+		echo "==> starting notification dispatcher (log: logs/notifications.log)"; \
+		nohup setsid node --env-file=.env UnivAI-app/scripts/notification-dispatcher.mjs --url http://localhost:$(APP_PORT) </dev/null > logs/notifications.log 2>&1 & echo $$! > logs/notifications.pid; \
+	fi; \
 	if curl -sf -m 2 http://127.0.0.1:3200 >/dev/null 2>&1; then \
 		echo "exams are already answering on :3200"; \
 	else \
@@ -634,7 +642,7 @@ endif
 	@echo "  exams  http://localhost:3200"
 	@echo "  RAG    $(RAG_MCP)"
 	@echo ""
-	@echo "  logs   logs/app.log, logs/exams.log, logs/worker.log, $(RAG_LOG)"
+	@echo "  logs   logs/app.log, logs/exams.log, logs/worker.log, logs/notifications.log, $(RAG_LOG)"
 	@echo "  RAG runs detached — 'make rag-logs' to watch it, 'make rag-down' to stop it."
 	@echo ""
 	@echo "  Ollama wakes automatically on Windows. The course generator and"
@@ -651,9 +659,9 @@ dev-integration: dev ## Explicit alias for the full real local integration stack
 # but livekit takes seconds more to unwind its child processes. `make dev` finds
 # the worker by pattern, so returning while one is still exiting makes it decide
 # a worker is already running and start none — leaving lectures with no voice.
-dev-stop: ## Stop app, exams and worker (containers and RAG keep running)
+dev-stop: ## Stop app, exams, worker and notifications (containers and RAG keep running)
 	@set -u; \
-	for name in app exams worker; do \
+	for name in notifications app exams worker; do \
 		pidfile="logs/$$name.pid"; \
 		if [ ! -f "$$pidfile" ]; then echo "  $$name  was not started by make dev"; continue; fi; \
 		pid="$$(cat "$$pidfile" 2>/dev/null || true)"; \
@@ -664,6 +672,7 @@ dev-stop: ## Stop app, exams and worker (containers and RAG keep running)
 		args="$$(ps -o args= -p "$$pid" 2>/dev/null || true)"; \
 		owned=""; \
 		case "$$name" in \
+			notifications) [ "$$cwd" = "$(abspath .)" ] && case "$$args" in *notification-dispatcher.mjs*) owned=1;; esac;; \
 			app) [ "$$cwd" = "$(abspath UnivAI-app)" ] && case "$$args" in *next*dev*) owned=1;; esac;; \
 			exams) [ "$$cwd" = "$(abspath UnivAI-exam_system)" ] && case "$$args" in *server.ts*dev*) owned=1;; esac;; \
 			worker) [ "$$cwd" = "$(abspath .)" ] && case "$$args" in *UnivAI-live/worker.py*dev*) owned=1;; esac;; \

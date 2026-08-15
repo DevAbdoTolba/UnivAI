@@ -48,6 +48,7 @@ RAG_TOOL_SEARCH = os.getenv("RAG_TOOL_SEARCH", "retrieve_context")
 RAG_TOOL_INGEST = os.getenv("RAG_TOOL_INGEST", "ingest_file")
 RAG_TOOL_INGEST_COLLECTION = os.getenv("RAG_TOOL_INGEST_COLLECTION", "ingest_collection")
 RAG_TOOL_PLAN = os.getenv("RAG_TOOL_PLAN", "create_programme_plan")
+RAG_TOOL_ABSENCE_TRIAGE = os.getenv("RAG_TOOL_ABSENCE_TRIAGE", "triage_absence")
 RAG_TOOL_REMOVE_COLLECTION_DOCUMENT = os.getenv(
     "RAG_TOOL_REMOVE_COLLECTION_DOCUMENT", "remove_collection_document"
 )
@@ -350,4 +351,13 @@ async def create_programme_plan(
             "seed_queries": seed_queries,
         },
         timeout=RAG_INGEST_TIMEOUT_S,
+    )
+
+
+async def triage_absence(case_facts: str, prior_answers: str = "") -> str:
+    """Ask the Agent for a schema-validated recommendation; humans still decide."""
+    return await _call_tool(
+        RAG_TOOL_ABSENCE_TRIAGE,
+        {"case_facts": case_facts, "prior_answers": prior_answers},
+        timeout=90,
     )
