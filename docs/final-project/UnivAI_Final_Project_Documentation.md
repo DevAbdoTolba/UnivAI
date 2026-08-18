@@ -17,6 +17,7 @@ Version 1.0  |  Evidence freeze: 13 August 2026  |  Cairo, Egypt
 | Document | UnivAI (JAMIEH) formal final-project documentation and evaluation dossier |
 | Version | 1.0 |
 | Prepared for | Final project discussion / defense |
+| Primary audience | Fresh graduates and early-career professionals pursuing fast, structured upskilling |
 | Prepared by | ITI Group G3 |
 | Evidence freeze | 13 August 2026 (Africa/Cairo) |
 | Repository scope | UnivAI App, Core, Agent, Live, Exam, infrastructure, and formal evidence package |
@@ -38,7 +39,7 @@ The team acknowledges ITI instructors, reviewers, and the open-source communitie
 
 # Abstract
 
-UnivAI, originally pitched as JAMIEH, is an adaptive learning platform that transforms an uploaded textbook into a structured, university-style experience. The platform ingests and indexes source material, proposes a curriculum, produces learning artifacts, delivers synchronized voice lectures, answers raised-hand questions with retrieval-augmented generation, conducts assessments, and records progress, attendance, grades, and final outcomes. The implemented system is a polyglot service architecture: a Next.js application and backend-for-frontend coordinate a Python Agent/RAG service, a LiveKit voice worker, an exam service, PostgreSQL, Qdrant, MongoDB, and filesystem-backed generated artifacts.
+UnivAI, originally pitched as JAMIEH, is a career-focused adaptive learning platform for ambitious fresh graduates and early-career professionals. It transforms an uploaded textbook into a fast, ordered, university-style skill-development experience. The platform ingests and indexes source material, proposes a curriculum, produces learning artifacts, delivers synchronized voice lectures, answers raised-hand questions with retrieval-augmented generation, conducts assessments, and records progress, attendance, grades, and final outcomes. The implemented system is a polyglot service architecture: a Next.js application and backend-for-frontend coordinate a Python Agent/RAG service, a LiveKit voice worker, an exam service, PostgreSQL, Qdrant, MongoDB, and filesystem-backed generated artifacts.
 
 The central engineering challenge is not merely generation quality; it is trustworthy continuity across identity, source grounding, realtime presence, reconnect behavior, assessment integrity, and recoverable state. The delivered RAG path combines dense and sparse retrieval, reciprocal-rank fusion, deduplication, cross-encoder reranking, tenant filters, explicit refusal, and server-resolved citations. A bounded LangGraph hierarchy delegates curriculum, content, and assessment work, although the production course generator is currently a separate imperative workflow.
 
@@ -50,7 +51,7 @@ The dossier records deterministic test runs totaling 1,218 passing assertions an
 
 *Figure 1. UnivAI product value chain. Source: authors, derived from the implemented repository.*
 
-UnivAI addresses a recurring gap in self-directed study: content is abundant, but pacing, grounding, interaction, assessment, and accountability are fragmented. A learner supplies a source; the platform turns it into a bounded learning programme and preserves evidence of what was taught, asked, answered, assessed, and attended. The product value is therefore an accountable learning loop, not a generic chat interface.
+UnivAI is designed primarily for ambitious fresh graduates and early-career professionals who need to close skill gaps quickly, follow a clear learning order, and remain competitive. It is not positioned as a family or parental learning product. Content is abundant, but pacing, grounding, interaction, assessment, and accountability are fragmented. A learner supplies a source; the platform turns it into a bounded learning programme and preserves evidence of what was taught, asked, answered, assessed, and attended. The product value is therefore an accountable learning loop, not a generic chat interface.
 
 **Table 2. Executive evidence scorecard**
 
@@ -117,7 +118,7 @@ The DOCX contains an updateable Microsoft Word table-of-contents field.
 
 ## 1.1 Background
 
-Digital learning commonly provides documents, videos, question banks, and chat assistants as separate experiences. The learner is still responsible for deciding what to study, whether an answer is supported by the source, when to revise, and whether enough of the course has actually been completed. JAMIEH was proposed to close that coordination gap by converting one source book into a coherent university-like journey. The delivered product is named UnivAI and retains that central proposition.
+Fresh graduates face a fast-moving job market and need to build relevant skills quickly without losing structure or depth. Digital learning commonly provides documents, videos, question banks, and chat assistants as separate experiences. The learner is still responsible for deciding what to study, whether an answer is supported by the source, when to revise, and whether enough of the course has actually been completed. JAMIEH was proposed to close that coordination gap by converting one source book into a coherent university-like journey. The delivered product is named UnivAI and retains that central proposition.
 
 ![Figure 2. System context](figures/02_system_context.png)
 
@@ -190,7 +191,7 @@ The baseline was reconstructed from the Group G3 project pitch, the February 202
 
 | Stakeholder | Primary need | Success evidence |
 | --- | --- | --- |
-| Learner | A coherent, accessible, trustworthy learning path | Can resume, ask, study, assess, and understand status |
+| Fresh graduate / early-career learner | Fast, ordered, career-relevant skill development | Can turn a source into a structured path, practise efficiently, demonstrate progress, and stay competitive |
 | Administrator | Operational visibility and defensible decisions | Dashboard exposes generation, attendance, grades, privacy, and incidents |
 | Academic reviewer | Source fidelity and assessment validity | Citations, provenance, blueprints, snapshots, and review records |
 | Project examiner | Traceable engineering and honest evaluation | Requirements, code paths, diagrams, tests, limitations, and reproducible assets |
