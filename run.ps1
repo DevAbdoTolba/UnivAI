@@ -534,8 +534,28 @@ function Assert-DevPrerequisites {
     }
 }
 
+function Stop-StrayLiveWorkers {
+    $venvPython = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".venv/Scripts/python.exe"))
+    $commandPattern = ('^"?' + [regex]::Escape($venvPython) + '"?\s+UnivAI-live[\\/]worker\.py\s+dev(?:\s|$)')
+    $workers = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -and $_.CommandLine -match $commandPattern
+    })
+    foreach ($worker in $workers | Sort-Object ProcessId -Descending) {
+        Stop-Process -Id $worker.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($workers.Count -gt 0) {
+        Write-Host "  removed $($workers.Count) stale worker process(es)" -ForegroundColor Yellow
+        Start-Sleep -Milliseconds 500
+    }
+}
+
 function Target-Dev {
     Assert-DevPrerequisites
+    # `dev` is a deterministic restart. Repeated launches previously left old
+    # LiveKit workers registered but draining; a new lecture could then be sent
+    # to the stale worker and fail even while another healthy worker existed.
+    Target-DevStop
+    Stop-StrayLiveWorkers
     if (-not (Test-Url "http://127.0.0.1:11434")) {
         Say "waking Ollama"
         $ollama = Get-Command ollama -ErrorAction SilentlyContinue
@@ -556,7 +576,11 @@ function Target-Dev {
     New-Item -ItemType Directory -Force -Path "logs" | Out-Null
     # RAG detaches itself and logs to a file, so it needs no window and no wait.
     Target-RagServer -Wait 0
-    $appProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" -PassThru
+    $appProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" `
+        -RedirectStandardOutput "logs/app.out.log" `
+        -RedirectStandardError "logs/app.error.log" `
+        -WindowStyle Hidden -PassThru
     $workerProcess = Start-Process powershell `
         -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 worker" `
         -RedirectStandardOutput "logs/worker.out.log" `
