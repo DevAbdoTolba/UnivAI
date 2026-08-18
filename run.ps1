@@ -557,7 +557,11 @@ function Target-Dev {
     # RAG detaches itself and logs to a file, so it needs no window and no wait.
     Target-RagServer -Wait 0
     $appProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" -PassThru
-    $workerProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 worker" -PassThru
+    $workerProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 worker" `
+        -RedirectStandardOutput "logs/worker.out.log" `
+        -RedirectStandardError "logs/worker.error.log" `
+        -WindowStyle Hidden -PassThru
     $examProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams" -PassThru
     $notificationProcess = Start-Process powershell `
         -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 notifications -AppPort $AppPort" `
@@ -646,11 +650,16 @@ function Target-Status {
     $lkUp    = Test-Url "http://127.0.0.1:7880"
     $notificationsUp = (Test-Path "logs/notifications.pid") -and
         [bool](Get-Process -Id ([int](Get-Content "logs/notifications.pid" -Raw)) -ErrorAction SilentlyContinue)
+    $workerUp = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -and $_.CommandLine -match [regex]::Escape("UnivAI-live/worker.py") -and
+        $_.CommandLine -match "\bdev\b"
+    }).Count -gt 0
     Write-Host ("app    :{0}  {1}" -f $AppPort, $(if ($appUp) { "up" } else { "down" }))
     Write-Host ("exams  :3200  {0}" -f $(if ($examsUp) { "up" } else { "down" }))
     Write-Host ("RAG    :{0}  {1}"  -f $RagPort, $(if ($ragUp) { "up" } else { "down" }))
     Write-Host ("qdrant :6333  {0}"  -f $(if ($qdrantUp) { "up" } else { "down" }))
     Write-Host ("livekit:7880  {0}"  -f $(if ($lkUp) { "up" } else { "down" }))
+    Write-Host ("worker          {0}" -f $(if ($workerUp) { "up" } else { "down" }))
     Write-Host ("notifications  {0}" -f $(if ($notificationsUp) { "up" } else { "down" }))
 
     if ($appUp) {
