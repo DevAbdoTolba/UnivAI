@@ -48,6 +48,9 @@ RAG_TOOL_SEARCH = os.getenv("RAG_TOOL_SEARCH", "retrieve_context")
 RAG_TOOL_INGEST = os.getenv("RAG_TOOL_INGEST", "ingest_file")
 RAG_TOOL_INGEST_COLLECTION = os.getenv("RAG_TOOL_INGEST_COLLECTION", "ingest_collection")
 RAG_TOOL_PLAN = os.getenv("RAG_TOOL_PLAN", "create_programme_plan")
+RAG_TOOL_PRACTICE = os.getenv(
+    "RAG_TOOL_PRACTICE", "generate_practice_assessment"
+)
 RAG_TOOL_ABSENCE_TRIAGE = os.getenv("RAG_TOOL_ABSENCE_TRIAGE", "triage_absence")
 RAG_TOOL_REMOVE_COLLECTION_DOCUMENT = os.getenv(
     "RAG_TOOL_REMOVE_COLLECTION_DOCUMENT", "remove_collection_document"
@@ -360,4 +363,30 @@ async def triage_absence(case_facts: str, prior_answers: str = "") -> str:
         RAG_TOOL_ABSENCE_TRIAGE,
         {"case_facts": case_facts, "prior_answers": prior_answers},
         timeout=90,
+    )
+
+
+async def generate_practice_assessment(
+    *,
+    topic_id: str,
+    topic_title: str,
+    topic_summary: str,
+    collection_id: str,
+    user_id: str,
+    document_ids: list[str] | None = None,
+) -> str:
+    """Ask the Agent for one grounded five-question practice assessment."""
+
+    return await _call_tool(
+        RAG_TOOL_PRACTICE,
+        {
+            "topic_id": topic_id,
+            "topic_title": topic_title,
+            "topic_summary": topic_summary,
+            "collection_id": collection_id,
+            "user_id": user_id,
+            "document_ids": document_ids or [],
+            "question_count": 5,
+        },
+        timeout=180,
     )
