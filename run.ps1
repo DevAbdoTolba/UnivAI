@@ -574,24 +574,28 @@ function Target-Dev {
     Say "launching RAG, app, worker, exams, and notifications"
     $root = $PSScriptRoot
     New-Item -ItemType Directory -Force -Path "logs" | Out-Null
-    # RAG detaches itself and logs to a file, so it needs no window and no wait.
+    # The RAG server stays detached for lifecycle safety, but its live log gets
+    # a visible terminal alongside every other development service.
     Target-RagServer -Wait 0
+    $ragLogProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI RAG'; Set-Location '$root'; ./run.ps1 rag-logs" `
+        -PassThru
+    # Keep each foreground service in its own visible, persistent terminal.
+    # Developers use these windows to inspect/copy live output (especially the
+    # local email preview), so do not redirect or hide their standard streams.
     $appProcess = Start-Process powershell `
-        -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" `
-        -RedirectStandardOutput "logs/app.out.log" `
-        -RedirectStandardError "logs/app.error.log" `
-        -WindowStyle Hidden -PassThru
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI App'; Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" `
+        -PassThru
     $workerProcess = Start-Process powershell `
-        -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 worker" `
-        -RedirectStandardOutput "logs/worker.out.log" `
-        -RedirectStandardError "logs/worker.error.log" `
-        -WindowStyle Hidden -PassThru
-    $examProcess = Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; ./run.ps1 exams" -PassThru
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI Live Worker'; Set-Location '$root'; ./run.ps1 worker" `
+        -PassThru
+    $examProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI Exams'; Set-Location '$root'; ./run.ps1 exams" `
+        -PassThru
     $notificationProcess = Start-Process powershell `
-        -ArgumentList "-NoProfile", "-Command", "Set-Location '$root'; ./run.ps1 notifications -AppPort $AppPort" `
-        -RedirectStandardOutput "logs/notifications.out.log" `
-        -RedirectStandardError "logs/notifications.error.log" `
-        -WindowStyle Hidden -PassThru
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI Notifications'; Set-Location '$root'; ./run.ps1 notifications -AppPort $AppPort" `
+        -PassThru
+    $ragLogProcess.Id | Set-Content "logs/rag-logs.pid"
     $appProcess.Id | Set-Content "logs/app.pid"
     $workerProcess.Id | Set-Content "logs/worker.pid"
     $examProcess.Id | Set-Content "logs/exams.pid"
@@ -654,7 +658,7 @@ function Stop-DevProcess([string]$Name) {
 }
 
 function Target-DevStop {
-    foreach ($name in @("notifications", "app", "exams", "worker")) { Stop-DevProcess $name }
+    foreach ($name in @("rag-logs", "notifications", "app", "exams", "worker")) { Stop-DevProcess $name }
 }
 
 function Target-DevRestart {
