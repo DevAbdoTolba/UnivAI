@@ -3,7 +3,7 @@
 #   ./run.ps1              list the targets
 #   ./run.ps1 setup        install node deps, python venv, RAG deps
 #   ./run.ps1 up           start Postgres + Qdrant and apply the schema
-#   ./run.ps1 dev          start everything, including the notification dispatcher
+#   ./run.ps1 dev          start the no-LiveKit final demo stack
 #   ./run.ps1 dev-restart  restart the complete dev stack after editing .env
 #
 # Same target names as the Makefile. Keep the two in step.
@@ -44,8 +44,8 @@ function Read-DotEnvValue($name) {
     return (($line -replace "^\s*$([regex]::Escape($name))\s*=\s*", "") -replace '^\s*["'']?|["'']?\s*$', "").Trim()
 }
 
-function Test-Url($url) {
-    try { Invoke-WebRequest -Uri $url -TimeoutSec 2 -UseBasicParsing | Out-Null; return $true }
+function Test-Url($url, [int]$TimeoutSeconds = 2) {
+    try { Invoke-WebRequest -Uri $url -TimeoutSec $TimeoutSeconds -UseBasicParsing | Out-Null; return $true }
     catch { return $false }
 }
 
@@ -53,13 +53,24 @@ function Test-TcpPort($port) {
     return [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
 }
 
-function Wait-Url($url, [int]$Seconds = 10) {
+function Wait-Url($url, [int]$Seconds = 10, [int]$RequestTimeoutSeconds = 2) {
     $deadline = (Get-Date).AddSeconds($Seconds)
     while ((Get-Date) -lt $deadline) {
-        if (Test-Url $url) { return $true }
+        if (Test-Url $url $RequestTimeoutSeconds) { return $true }
         Start-Sleep -Milliseconds 500
     }
     return $false
+}
+
+function Warm-Url($url, [int]$TimeoutSeconds = 60) {
+    try {
+        Invoke-WebRequest -Uri $url -TimeoutSec $TimeoutSeconds -UseBasicParsing | Out-Null
+        return
+    } catch {
+        $response = $_.Exception.Response
+        if ($response -and [int]$response.StatusCode -in @(400, 401, 403, 404, 409)) { return }
+        throw
+    }
 }
 
 function Target-Help {
@@ -94,10 +105,11 @@ function Target-Help {
         @("exams",  "Run the exam system (:3200)"),
         @("notifications", "Run the durable notification dispatcher"),
         @("slides", "Build the Slidev decks to UnivAI-app/public/slides/"),
-        @("dev",    "Check prerequisites, then start RAG + app + worker + exams"),
+        @("dev",    "Start the final demo; media prepares automatically"),
+        @("demo",   "Explicit alias for the final demo"),
         @("dev-stop","Stop app, worker and exams; keep RAG and containers running"),
         @("dev-restart","Restart everything launched by dev"),
-        @("dev-integration","Explicit full integrated-stack alias"),
+        @("dev-integration","Start the rollback LiveKit + worker stack"),
         @("status", "Show what is running"),
         @("clean",  "Remove containers AND volumes (destroys the DB and the vectors)")
     )
@@ -536,7 +548,9 @@ function Assert-DevPrerequisites {
 
 function Stop-StrayLiveWorkers {
     $venvPython = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".venv/Scripts/python.exe"))
-    $commandPattern = ('^"?' + [regex]::Escape($venvPython) + '"?\s+UnivAI-live[\\/]worker\.py\s+dev(?:\s|$)')
+    $workerScript = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "UnivAI-live/worker.py"))
+    $scriptPattern = '(?:UnivAI-live[\\/]worker\.py|"?' + [regex]::Escape($workerScript) + '"?)'
+    $commandPattern = ('^"?' + [regex]::Escape($venvPython) + '"?\s+' + $scriptPattern + '\s+dev(?:\s|$)')
     $workers = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
         $_.CommandLine -and $_.CommandLine -match $commandPattern
     })
@@ -547,9 +561,13 @@ function Stop-StrayLiveWorkers {
         Write-Host "  removed $($workers.Count) stale worker process(es)" -ForegroundColor Yellow
         Start-Sleep -Milliseconds 500
     }
+    $remaining = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -and $_.CommandLine -match $commandPattern
+    })
+    if ($remaining.Count -gt 0) { throw "A UnivAI-live worker from this checkout is still running." }
 }
 
-function Target-Dev {
+function Target-DevIntegration {
     Assert-DevPrerequisites
     # `dev` is a deterministic restart. Repeated launches previously left old
     # LiveKit workers registered but draining; a new lecture could then be sent
@@ -609,6 +627,98 @@ function Target-Dev {
     Write-Host "  RAG runs detached - './run.ps1 rag-logs' to watch it, './run.ps1 rag-down' to stop it." -ForegroundColor DarkGray
 }
 
+function Assert-DemoPrerequisites {
+    $setupPaths = @(".env", $Py, "UnivAI-app/node_modules", "UnivAI-exam_system/node_modules", "UnivAI-Agent/.venv")
+    $missing = @($setupPaths | Where-Object { -not (Test-Path $_) })
+    if ($missing.Count -gt 0) {
+        throw "Project setup is incomplete (missing: $($missing -join ', ')). Run: ./run.ps1 install ; ./run.ps1 setup"
+    }
+    docker info *> $null
+    if ($LASTEXITCODE -ne 0) { throw "Docker is not running. Start Docker, then run: ./run.ps1 up" }
+    $notReady = @()
+    foreach ($container in @("univai-db", "univai-qdrant", "univai-mongo")) {
+        $state = docker inspect --format "{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" $container 2>$null
+        if ($LASTEXITCODE -ne 0 -or $state -ne "running/healthy") {
+            $notReady += "$container($(if ($state) { $state } else { 'missing' }))"
+        }
+    }
+    if ($notReady.Count -gt 0) { throw "Demo infrastructure is not ready: $($notReady -join ', '). Start the data services first." }
+}
+
+function Target-DemoMedia {
+    $env:LIVE_SESSION_TRANSPORT = "demo_media"
+    Push-Location UnivAI-app
+    try {
+        npm run demo:backfill-media
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } finally {
+        Pop-Location
+    }
+}
+
+function Target-Demo {
+    Assert-DemoPrerequisites
+    Target-DevStop
+    Stop-StrayLiveWorkers
+    docker stop univai-livekit *> $null
+    $livekitRunning = docker inspect --format "{{.State.Running}}" univai-livekit 2>$null
+    if ($LASTEXITCODE -eq 0 -and $livekitRunning -eq "true") { throw "The LiveKit container did not stop." }
+    $env:LIVE_SESSION_TRANSPORT = "demo_media"
+    $env:LIVEKIT_URL = ""
+    $env:LIVEKIT_API_KEY = ""
+    $env:LIVEKIT_API_SECRET = ""
+    $env:NEXT_PUBLIC_LIVEKIT_URL = ""
+    Target-Schema
+
+    Say "launching final demo: RAG, app, exams, and notifications (no LiveKit worker)"
+    $root = $PSScriptRoot
+    New-Item -ItemType Directory -Force -Path "logs" | Out-Null
+    Target-RagServer -Wait 0
+    $ragLogProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI RAG'; Set-Location '$root'; ./run.ps1 rag-logs" `
+        -PassThru
+    $appProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI Demo'; `$env:LIVE_SESSION_TRANSPORT='demo_media'; `$env:LIVEKIT_URL=''; `$env:LIVEKIT_API_KEY=''; `$env:LIVEKIT_API_SECRET=''; `$env:NEXT_PUBLIC_LIVEKIT_URL=''; Set-Location '$root'; ./run.ps1 app -AppPort $AppPort" `
+        -PassThru
+    $examProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI Exams'; Set-Location '$root'; ./run.ps1 exams" `
+        -PassThru
+    $notificationProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI Notifications'; Set-Location '$root'; ./run.ps1 notifications -AppPort $AppPort" `
+        -PassThru
+    $demoMediaProcess = Start-Process powershell `
+        -ArgumentList "-NoProfile", "-NoExit", "-Command", "`$Host.UI.RawUI.WindowTitle = 'UnivAI Demo Media'; Set-Location '$root'; ./run.ps1 demo-media" `
+        -PassThru
+    $ragLogProcess.Id | Set-Content "logs/rag-logs.pid"
+    $appProcess.Id | Set-Content "logs/app.pid"
+    $examProcess.Id | Set-Content "logs/exams.pid"
+    $notificationProcess.Id | Set-Content "logs/notifications.pid"
+    $demoMediaProcess.Id | Set-Content "logs/demo-media.pid"
+    Remove-Item -LiteralPath "logs/worker.pid" -ErrorAction SilentlyContinue
+
+    Say "waiting for the web app to finish its first compile"
+    if (-not (Wait-Url "http://localhost:$AppPort/api/clock" 120 15)) {
+        throw "The app did not become ready on http://localhost:$AppPort. Read the visible 'UnivAI Demo' terminal."
+    }
+    if (-not (Wait-Url "http://localhost:3200/api/health" 120 15)) {
+        throw "The exam service did not become ready on http://localhost:3200. Read the visible 'UnivAI Exams' terminal."
+    }
+    Say "warming the exam page and exam-data route"
+    if (-not (Wait-Url "http://localhost:3200/exam/000000000000000000000000?uiLocale=en" 120 60)) {
+        throw "The exam page did not finish its first compile. Read the visible 'UnivAI Exams' terminal."
+    }
+    Warm-Url "http://localhost:3200/api/exams/000000000000000000000000" 60
+
+    Write-Host ""
+    Write-Host "  demo   http://localhost:$AppPort" -ForegroundColor Green
+    Write-Host "  mode   demo-media; LiveKit container and worker stopped" -ForegroundColor Green
+    Write-Host "  media  existing accounts backfill now; new courses render before becoming ready" -ForegroundColor Green
+    Write-Host "  health http://localhost:$AppPort/api/health"
+    Write-Host ""
+}
+
+function Target-Dev { Target-Demo }
+
 function Stop-DevProcess([string]$Name) {
     $pidFile = Join-Path $PSScriptRoot "logs/$Name.pid"
     if (-not (Test-Path -LiteralPath $pidFile)) {
@@ -658,7 +768,7 @@ function Stop-DevProcess([string]$Name) {
 }
 
 function Target-DevStop {
-    foreach ($name in @("rag-logs", "notifications", "app", "exams", "worker")) { Stop-DevProcess $name }
+    foreach ($name in @("demo-media", "rag-logs", "notifications", "app", "exams", "worker")) { Stop-DevProcess $name }
 }
 
 function Target-DevRestart {
@@ -728,9 +838,11 @@ switch ($Target.ToLower()) {
     "notifications" { Target-Notifications }
     "slides" { Target-Slides }
     "dev"    { Target-Dev }
+    "demo"   { Target-Demo }
     "dev-stop" { Target-DevStop }
     "dev-restart" { Target-DevRestart }
-    "dev-integration" { Target-Dev }
+    "demo-media" { Target-DemoMedia }
+    "dev-integration" { Target-DevIntegration }
     "status" { Target-Status }
     "clean"  { Target-Clean }
     default  { Warn "Unknown target '$Target'"; Target-Help; exit 1 }

@@ -1,13 +1,10 @@
-# Legacy lecture directory
-
-Integrated UnivAI no longer generates or reads learner content here.
+# Account lecture directory
 
 Semester plans live in `books.semester_plan`; lecture scripts, structured
 slides, quizzes, and generation checkpoints live in `lecture_artifacts`; and
 grounded practicals live in `section_packs`. PostgreSQL generates opaque UUIDs
-for every public lecture and section identifier. The app renders slides from
-JSONB, the exam bridge reads quiz JSONB, and the Live worker reads narration
-JSONB and synthesizes speech on demand.
+for every public lecture and section identifier.
 
-This directory remains only as a clear boundary for old local artifacts and
-standalone fixtures. Nothing in the integrated generation path writes here.
+The no-LiveKit demo stores each account's validated playable lecture bundle at
+`<registration-number>/week-<N>/demo-media/<artifact>/plan-<N>/<script-digest>/`.
+These generated account folders are ignored by Git; only this README is tracked.

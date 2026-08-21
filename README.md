@@ -5,6 +5,9 @@ See [docs/integration-development.md](docs/integration-development.md) for
 clean-clone setup, deterministic seed/smoke commands, provider requirements,
 production guards, and the required Git submodule pointer workflow.
 
+For the release demo without LiveKit or the voice worker, see
+[docs/final-demo-no-livekit.md](docs/final-demo-no-livekit.md).
+
 **Upload a textbook. Get a university.**
 
 One PDF goes in. Out comes a living four-week semester:
@@ -22,7 +25,7 @@ make install # system tools
 make setup   # project dependencies and .env
 make models  # voice files and local LLM
 make up      # Postgres + Qdrant + Mongo containers
-make dev     # check prerequisites, then start the application services
+make dev     # final demo: no LiveKit; account media prepares automatically
 ```
 
 Then open **http://localhost:3100** → upload a book on `/upload` → drive time from `/admin`.

@@ -34,6 +34,7 @@ logs/
 .cache/
 # rendered narration, rebuilt on demand from lecture_artifacts.script_payload
 .audio-cache/
+demo-media/
 
 # os
 Thumbs.db

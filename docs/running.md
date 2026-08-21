@@ -105,15 +105,16 @@ compiles its disposable Slidev render cache; this legacy target is not needed.
 
 ```bash
 make up      # containers + schema
-make dev     # check prerequisites, then start RAG + app + worker + exams
+make dev     # final demo: RAG + app + exams; no LiveKit worker
 ```
 
 Windows without `make`: `./run.ps1 up ; ./run.ps1 dev` — same names, same behaviour.
 
-`dev` never starts or recreates containers and never downloads models. If a
-prerequisite is missing, it exits with the exact earlier command to run. On
-Linux, service output is kept in `logs/app.log`, `logs/exams.log`,
-`logs/worker.log`, and `logs/rag-mcp.log`.
+On this branch, `dev` stops LiveKit, backfills existing account media, and makes
+new course generation publish audio before reporting ready. Use
+`make dev-integration` only for the LiveKit + worker rollback path. `dev` never
+recreates data containers or downloads models. On Linux, output is kept in
+`logs/app.log`, `logs/exams.log`, `logs/demo-media.log`, and `logs/rag-mcp.log`.
 
 
 ## Is everything up?

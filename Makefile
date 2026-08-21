@@ -12,8 +12,8 @@ SHELL := /bin/bash
 ifeq ($(OS),Windows_NT)
 
 POWERSHELL ?= powershell
-WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration dev-stop dev-restart status clean
-WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w
+WIN_TARGETS := help install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev demo dev-integration dev-stop dev-restart status clean
+WIN_ALIAS_TARGETS := install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w demo_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w
 
 .PHONY: $(WIN_TARGETS) $(WIN_ALIAS_TARGETS) install-node node-check
 
@@ -22,13 +22,13 @@ help: ## Show this help
 	@echo.
 	@echo Windows aliases are also available: make up_w, make dev_w, make migrate_w, make seed_w, etc.
 
-install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev dev-integration dev-stop dev-restart status clean:
+install setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-db rag-down rag-logs rag-stop app worker exams slides dev demo dev-integration dev-stop dev-restart status clean:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $@
 
 install-node node-check:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 install
 
-install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w:
+install_w setup_w env_w models_w up_w down_w schema_w migrate_w seed_w seed-data_w seed-auth_w seed-demo_w submodules-check_w contract-check_w sprint3-smoke_w integration-smoke_w rag-models_w rag-cache-clean_w reset_w rag_w rag-db_w rag-down_w rag-logs_w rag-stop_w app_w worker_w exams_w slides_w dev_w demo_w dev-integration_w dev-stop_w dev-restart_w status_w clean_w:
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 $(patsubst %_w,%,$@)
 
 else
@@ -95,7 +95,7 @@ export PATH := $(WINDOWS_NODE_DIR):$(PATH)
 endif
 endif
 
-.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-server rag-db rag-down rag-logs rag-stop app worker exams slides dev-check dev dev-integration dev-stop dev-restart status clean
+.PHONY: help install install-node node-check setup env models up down schema migrate seed seed-data seed-auth seed-demo submodules-check contract-check sprint3-smoke integration-smoke rag-models rag-cache-clean reset rag rag-server rag-db rag-down rag-logs rag-stop app worker exams slides dev-check dev demo dev-integration dev-stop dev-restart status clean
 
 help: ## Show this help
 	@echo ""
@@ -536,7 +536,7 @@ dev-check:
 	fi; \
 	echo "development prerequisites are ready"
 
-dev: dev-check ## Start RAG + app + worker + exams + notifications
+dev-integration: dev-check ## Start the rollback LiveKit + worker stack
 	@echo "==> launching RAG, app, worker, exams and notifications"
 ifeq ($(OS),Windows_NT)
 # On Windows the ollama CLI starts the daemon app when it is not running.
@@ -562,7 +562,7 @@ else
 			command="$$(ps -o comm= -p $$pid 2>/dev/null || true)"; \
 			if [ "$$cwd" != "$$expected_cwd" ]; then \
 				echo "ERROR: :$$port is held by pid $$pid outside this checkout ($$cwd)."; \
-				echo "Stop that process, then rerun: make dev"; \
+				echo "Stop that process, then rerun: make dev-integration"; \
 				return 1; \
 			fi; \
 			case "$$command" in next-server*) ;; *) \
@@ -648,20 +648,54 @@ endif
 	@echo "  Ollama wakes automatically on Windows. The course generator and"
 	@echo "  lecture Q&A call it at :11434 ($(MODELS_LLM) - one local model, no fallback)."
 
-dev-integration: dev ## Explicit alias for the full real local integration stack
+demo: export LIVE_SESSION_TRANSPORT=demo_media
+demo: export LIVEKIT_URL=
+demo: export LIVEKIT_API_KEY=
+demo: export LIVEKIT_API_SECRET=
+demo: export NEXT_PUBLIC_LIVEKIT_URL=
+dev: demo ## Start the final demo; media prepares automatically
 
-# `make dev` starts app, exams and worker detached with setsid, so each one is
+demo: schema ## Explicit alias for the final demo
+	@$(MAKE) --no-print-directory dev-stop
+	@set -eu; \
+	for p in $$(pgrep -f 'UnivAI-live/[w]orker\.py dev' 2>/dev/null || true); do \
+		[ "$$(readlink -f /proc/$$p/cwd 2>/dev/null)" = "$(abspath .)" ] || continue; \
+		pgid="$$(ps -o pgid= -p "$$p" 2>/dev/null | tr -d ' ')"; \
+		if [ -n "$$pgid" ]; then kill -TERM -"$$pgid" 2>/dev/null || true; else kill -TERM "$$p" 2>/dev/null || true; fi; \
+	done; \
+	for i in $$(seq 1 20); do \
+		remaining=""; \
+		for p in $$(pgrep -f 'UnivAI-live/[w]orker\.py dev' 2>/dev/null || true); do \
+			[ "$$(readlink -f /proc/$$p/cwd 2>/dev/null)" = "$(abspath .)" ] && remaining="$$p" && break; \
+		done; \
+		[ -z "$$remaining" ] && break; sleep 0.25; \
+	done; \
+	[ -z "$${remaining:-}" ] || { echo "ERROR: a UnivAI-live worker from this checkout is still running."; exit 1; }
+	@docker stop univai-livekit >/dev/null 2>&1 || true
+	@state="$$(docker inspect --format '{{.State.Running}}' univai-livekit 2>/dev/null || echo false)"; \
+	[ "$$state" != "true" ] || { echo "ERROR: the LiveKit container did not stop."; exit 1; }
+	@mkdir -p logs
+	@$(MAKE) --no-print-directory rag-server RAG_WAIT=0
+	@nohup setsid sh -c 'cd UnivAI-app && exec env LIVE_SESSION_TRANSPORT=demo_media LIVEKIT_URL= LIVEKIT_API_KEY= LIVEKIT_API_SECRET= NEXT_PUBLIC_LIVEKIT_URL= npx next dev -p $(APP_PORT)' </dev/null > logs/app.log 2>&1 & echo $$! > logs/app.pid
+	@nohup setsid sh -c 'cd UnivAI-exam_system && exec node --env-file=../.env --import tsx server.ts dev' </dev/null > logs/exams.log 2>&1 & echo $$! > logs/exams.pid
+	@nohup setsid env LIVE_SESSION_TRANSPORT=demo_media LIVEKIT_URL= LIVEKIT_API_KEY= LIVEKIT_API_SECRET= NEXT_PUBLIC_LIVEKIT_URL= node --env-file=.env UnivAI-app/scripts/notification-dispatcher.mjs --url http://localhost:$(APP_PORT) </dev/null > logs/notifications.log 2>&1 & echo $$! > logs/notifications.pid
+	@nohup setsid sh -c 'cd UnivAI-app && exec env LIVE_SESSION_TRANSPORT=demo_media npm run demo:backfill-media' </dev/null > logs/demo-media.log 2>&1 & echo $$! > logs/demo-media.pid
+	@rm -f logs/worker.pid
+	@echo "demo: http://localhost:$(APP_PORT) (demo-media; LiveKit and worker stopped)"
+	@echo "media: existing accounts backfill now; new courses render before becoming ready"
+
+# The launch targets start services detached with setsid, so each one is
 # its own process GROUP and the recorded pid is the group leader. Signalling the
 # group is what actually stops the server underneath — killing the pid alone
 # leaves the real next/node/python child orphaned and still holding its port.
 #
 # The trailing wait is for the worker specifically: its group leader dies first,
-# but livekit takes seconds more to unwind its child processes. `make dev` finds
+# but livekit takes seconds more to unwind its child processes. `make dev-integration` finds
 # the worker by pattern, so returning while one is still exiting makes it decide
 # a worker is already running and start none — leaving lectures with no voice.
 dev-stop: ## Stop app, exams, worker and notifications (containers and RAG keep running)
 	@set -u; \
-	for name in notifications app exams worker; do \
+	for name in demo-media notifications app exams worker; do \
 		pidfile="logs/$$name.pid"; \
 		if [ ! -f "$$pidfile" ]; then echo "  $$name  was not started by make dev"; continue; fi; \
 		pid="$$(cat "$$pidfile" 2>/dev/null || true)"; \
@@ -672,6 +706,7 @@ dev-stop: ## Stop app, exams, worker and notifications (containers and RAG keep 
 		args="$$(ps -o args= -p "$$pid" 2>/dev/null || true)"; \
 		owned=""; \
 		case "$$name" in \
+			demo-media) [ "$$cwd" = "$(abspath UnivAI-app)" ] && case "$$args" in *demo:backfill-media*) owned=1;; esac;; \
 			notifications) [ "$$cwd" = "$(abspath .)" ] && case "$$args" in *notification-dispatcher.mjs*) owned=1;; esac;; \
 			app) [ "$$cwd" = "$(abspath UnivAI-app)" ] && case "$$args" in *next*dev*) owned=1;; esac;; \
 			exams) [ "$$cwd" = "$(abspath UnivAI-exam_system)" ] && case "$$args" in *server.ts*dev*) owned=1;; esac;; \

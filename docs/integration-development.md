@@ -25,8 +25,9 @@ Set-Location UnivAI
 ./run.ps1 dev-integration
 ```
 
-`make dev` and `./run.ps1 dev` keep their existing integrated meaning.
-`dev-integration` is an explicit alias, not a fixture mode.
+On `final-demo/no-livekit`, `make dev` and `./run.ps1 dev` select the release
+demo transport. `dev-integration` remains the explicit real LiveKit rollback
+path, not a fixture mode.
 
 ## Integration command family
 
